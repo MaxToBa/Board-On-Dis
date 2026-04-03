@@ -1,7 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { useAuthStore } from '@/store/auth'
 import Avatar from '@/components/ui/Avatar'
 
@@ -24,7 +23,7 @@ export default function Header() {
     <header className="sticky top-0 z-40 bg-bg/80 backdrop-blur-md border-b border-white/5">
       <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <Image src="/logo.png" alt="Board On Dis" width={32} height={32} className="rounded-lg" />
+          <img src="/logo.png" alt="Board On Dis" width={32} height={32} className="rounded-lg" />
           <span className="font-bold text-white hidden sm:block">Board On Dis</span>
         </Link>
 

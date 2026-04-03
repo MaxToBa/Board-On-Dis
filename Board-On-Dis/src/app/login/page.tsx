@@ -1,6 +1,5 @@
 'use client'
 import { useState } from 'react'
-import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
@@ -65,7 +64,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <Image src="/logo.png" alt="Board On Dis" width={300} height={300} className="mb-3 drop-shadow-2xl" priority />
+          <img src="/logo.png" alt="Board On Dis" width={300} className="mb-3 drop-shadow-2xl" />
           <p className="text-sm text-white/50 mt-1">เล่นเกมกับเพื่อนได้ทุกที่</p>
         </div>
 
