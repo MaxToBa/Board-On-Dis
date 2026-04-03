@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-turbopack)",
+      "Bash(where node:*)",
+      "Bash(cmd /c \"node --version\")",
+      "Bash(cmd /c \"npm --version\")",
+      "Bash(cmd /c \"where node\")",
+      "Bash(cmd /c \"where npm\")",
+      "Bash(cmd /c \"winget --version\")",
+      "Bash(cmd /c \"winget install OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements\")",
+      "Bash(powershell -Command \"winget install OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements\")",
+      "Bash(powershell -Command \"Get-Content 'C:\\\\Users\\\\maxza\\\\AppData\\\\Local\\\\Packages\\\\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\\\\LocalState\\\\DiagOutputDir\\\\OpenJS.NodeJS.LTS.24.14.1-26-04-03-10-13-56.log' | Select-String -Pattern 'error|Error|fail|Fail' | Select-Object -Last 30\")",
+      "Bash(powershell -Command \"Invoke-WebRequest -Uri 'https://nodejs.org/dist/v22.14.0/node-v22.14.0-win-x64.zip' -OutFile 'C:\\\\Users\\\\maxza\\\\AppData\\\\Local\\\\node.zip' -UseBasicParsing\")",
+      "Bash(powershell -Command \"Expand-Archive -Path 'C:\\\\Users\\\\maxza\\\\AppData\\\\Local\\\\node.zip' -DestinationPath 'C:\\\\Users\\\\maxza\\\\AppData\\\\Local\\\\' -Force\")"
+    ]
+  }
+}

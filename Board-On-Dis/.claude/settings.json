@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wmic logicaldisk:*)",
+      "Bash(powershell -Command ':*)",
+      "Read(//e/nodejs//**)",
+      "Bash(/e/nodejs/node-v22.14.0-win-x64/node.exe --version)",
+      "Bash(export PATH=\"/e/nodejs/node-v22.14.0-win-x64:$PATH\")",
+      "Bash(npm --version)",
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-turbopack --yes)",
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-turbopack --yes --name board-on-dis)",
+      "Bash(npx create-next-app@latest game-room-v2 --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-turbopack --yes)",
+      "Bash(rsync -a --exclude='.git' game-room-v2/ Board-On-Dis/)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)"
+    ]
+  }
+}

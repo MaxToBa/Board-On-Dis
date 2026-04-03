@@ -1,0 +1,29 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Noto+Sans+Thai:wght@300;400;600&family=Syne:wght@400;600;800&display=swap");
+
+@import "tailwindcss";
+
+@theme inline {
+  --color-bg: #0a0a0f;
+  --color-surface: #12121a;
+  --color-surface2: #1a1a26;
+  --color-accent: #e8c547;
+  --color-purple: #7c6af5;
+  --color-green: #4fcf8e;
+  --color-red: #f05a5a;
+  --color-muted: #6b6880;
+  --color-border: rgba(255,255,255,0.07);
+
+  --font-display: "DM Serif Display", serif;
+  --font-sans: "Noto Sans Thai", sans-serif;
+  --font-ui: "Syne", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: #0a0a0f;
+  color: #e5e5e5;
+  font-family: "Noto Sans Thai", "DM Serif Display", sans-serif;
+}
