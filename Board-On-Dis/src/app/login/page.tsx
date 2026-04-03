@@ -41,14 +41,14 @@ export default function LoginPage() {
   async function handleGoogle() {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/` },
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
     })
   }
 
   async function handleDiscord() {
     await supabase.auth.signInWithOAuth({
       provider: 'discord',
-      options: { redirectTo: `${window.location.origin}/` },
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
     })
   }
 
