@@ -1,6 +1,7 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useAuthStore } from '@/store/auth'
 import Avatar from '@/components/ui/Avatar'
 
@@ -23,11 +24,8 @@ export default function Header() {
     <header className="sticky top-0 z-40 bg-bg/80 backdrop-blur-md border-b border-white/5">
       <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          {/* Logo placeholder — replace with actual logo image */}
-          <div className="w-8 h-8 rounded-lg bg-accent/20 border border-accent/30 flex items-center justify-center text-accent font-bold text-sm">
-            G
-          </div>
-          <span className="font-bold text-white hidden sm:block">Game Room</span>
+          <Image src="/logo.png" alt="Board On Dis" width={32} height={32} className="rounded-lg" />
+          <span className="font-bold text-white hidden sm:block">Board On Dis</span>
         </Link>
 
         <div className="flex items-center gap-3">

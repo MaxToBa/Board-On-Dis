@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { motion } from 'framer-motion'
 import Header from '@/components/layout/Header'
 import GameCard from '@/components/lobby/GameCard'
@@ -170,11 +171,14 @@ export default function LobbyPage() {
                 </div>
               )}
             </div>
-            <h1 className="text-[clamp(2.5rem,7vw,5rem)] leading-[1.05] tracking-tight text-white font-display">
-              เล่นเกม<br />
-              <span className="text-purple">กับเพื่อน</span><br />
-              ได้ทุกที่
-            </h1>
+            <div className="flex items-center gap-6 mb-2">
+              <Image src="/logo.png" alt="Board On Dis" width={140} height={140} className="drop-shadow-2xl flex-shrink-0" priority />
+              <h1 className="text-[clamp(2.5rem,7vw,5rem)] leading-[1.05] tracking-tight text-white font-display">
+                เล่นเกม<br />
+                <span className="text-purple">กับเพื่อน</span><br />
+                ได้ทุกที่
+              </h1>
+            </div>
             <p className="mt-4 text-muted max-w-md leading-relaxed text-base">
               เลือกเกมที่ชอบ สร้างห้อง แล้วส่ง code ให้เพื่อน หรือเล่นคนเดียวกับ AI ก็ได้
             </p>
