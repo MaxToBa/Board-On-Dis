@@ -12,7 +12,8 @@
       "Bash(npx create-next-app@latest game-room-v2 --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-turbopack --yes)",
       "Bash(rsync -a --exclude='.git' game-room-v2/ Board-On-Dis/)",
       "Bash(npm install:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Read(//e/Board On Dis/**)"
     ]
   }
 }
