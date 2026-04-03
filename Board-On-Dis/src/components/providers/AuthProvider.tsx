@@ -36,7 +36,19 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       .select('username, avatar_url')
       .eq('id', userId)
       .single()
-    if (data) setProfile(data)
+
+    if (data) {
+      // ถ้าไม่มี avatar ใน DB ให้ดึงจาก OAuth metadata แล้วบันทึกลง DB
+      if (!data.avatar_url) {
+        const { data: { user } } = await supabase.auth.getUser()
+        const metaAvatar = user?.user_metadata?.avatar_url ?? null
+        if (metaAvatar) {
+          data.avatar_url = metaAvatar
+          await supabase.from('profiles').update({ avatar_url: metaAvatar }).eq('id', userId)
+        }
+      }
+      setProfile(data)
+    }
   }
 
   return <>{children}</>

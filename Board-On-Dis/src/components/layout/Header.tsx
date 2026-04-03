@@ -34,7 +34,7 @@ export default function Header() {
                 onClick={() => setOpen(!open)}
                 className="flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-white/5 transition-colors"
               >
-                <Avatar src={profile?.avatar_url} name={displayName} size="sm" />
+                <Avatar src={profile?.avatar_url ?? user?.user_metadata?.avatar_url} name={displayName} size="sm" />
                 <span className="text-sm text-white/80 hidden sm:block">{displayName}</span>
                 <svg className="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
