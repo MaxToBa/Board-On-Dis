@@ -172,7 +172,7 @@ export default function LobbyPage() {
               )}
             </div>
             <div className="flex items-center gap-6 mb-2">
-              <Image src="/logo.png" alt="Board On Dis" width={140} height={140} className="drop-shadow-2xl flex-shrink-0" priority />
+              <Image src="/logo.png" alt="Board On Dis" width={220} height={220} className="drop-shadow-2xl flex-shrink-0" priority />
               <h1 className="text-[clamp(2.5rem,7vw,5rem)] leading-[1.05] tracking-tight text-white font-display">
                 เล่นเกม<br />
                 <span className="text-purple">กับเพื่อน</span><br />
