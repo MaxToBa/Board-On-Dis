@@ -1,13 +1,11 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth'
 import Avatar from '@/components/ui/Avatar'
 
 export default function Header() {
   const { user, profile, signOut } = useAuthStore()
-  const router = useRouter()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -67,7 +65,7 @@ export default function Header() {
                   </Link>
                   <div className="border-t border-white/10" />
                   <button
-                    onClick={async () => { await signOut(); setOpen(false); router.push('/login') }}
+                    onClick={async () => { setOpen(false); await signOut(); window.location.href = '/login' }}
                     className="w-full flex items-center gap-2 px-4 py-3 text-sm text-red hover:bg-white/5 transition-colors"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
