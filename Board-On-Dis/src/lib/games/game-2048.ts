@@ -39,8 +39,10 @@ export function move(board: Board, dir: Direction): { board: Board; score: numbe
   let totalScore = 0
   let moved = false
 
+  // rotate CW: col c (bottom→top) becomes row c
   const rotate = (b: Board) => b[0].map((_, c) => b.map((r) => r[c]).reverse())
-  const rotateCCW = (b: Board) => b[0].map((_, c) => b.map((r) => r[c])).map((r) => [...r].reverse())
+  // rotate CCW: col (3-r) becomes row r
+  const rotateCCW = (b: Board) => b[0].map((_, r) => b.map((row) => row[b[0].length - 1 - r]))
 
   if (dir === 'up') b = rotateCCW(b)
   if (dir === 'down') b = rotate(b)

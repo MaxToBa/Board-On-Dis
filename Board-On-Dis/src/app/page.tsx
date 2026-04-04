@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import GameCard from '@/components/lobby/GameCard'
 import GameModal from '@/components/lobby/GameModal'
@@ -170,17 +171,28 @@ export default function LobbyPage() {
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-6 mb-2">
+            <div className="flex items-center gap-6 mb-4 flex-wrap">
               <img src="/logo.png" alt="Board On Dis" width={220} className="drop-shadow-2xl flex-shrink-0" />
-              <h1 className="text-[clamp(2.5rem,7vw,5rem)] leading-[1.05] tracking-tight text-white font-display">
-                เล่นเกม<br />
-                <span className="text-purple">กับเพื่อน</span><br />
-                ได้ทุกที่
-              </h1>
+              <div>
+                <h1 className="text-[clamp(2.5rem,7vw,5rem)] leading-[1.05] tracking-tight text-white font-display">
+                  เล่นเกม<br />
+                  <span className="text-purple">กับเพื่อน</span><br />
+                  ได้ทุกที่
+                </h1>
+              </div>
             </div>
-            <p className="mt-4 text-muted max-w-md leading-relaxed text-base">
-              เลือกเกมที่ชอบ สร้างห้อง แล้วส่ง code ให้เพื่อน หรือเล่นคนเดียวกับ AI ก็ได้
-            </p>
+            <div className="flex items-center gap-3 flex-wrap mt-2">
+              <p className="text-muted max-w-md leading-relaxed text-base">
+                เลือกเกมที่ชอบ สร้างห้อง แล้วส่ง code ให้เพื่อน หรือเล่นคนเดียวกับ AI ก็ได้
+              </p>
+              <Link
+                href="/leaderboard"
+                className="flex items-center gap-2 bg-surface border border-white/10 hover:border-accent/40 hover:bg-accent/5 text-white hover:text-accent rounded-xl px-4 py-2.5 text-sm font-bold transition-all"
+                onClick={() => sound.click()}
+              >
+                🏆 ดูอันดับ
+              </Link>
+            </div>
           </motion.section>
 
           <motion.div
