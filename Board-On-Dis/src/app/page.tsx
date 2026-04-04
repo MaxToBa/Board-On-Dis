@@ -118,7 +118,7 @@ export default function LobbyPage() {
       .on('presence', { event: 'sync' }, () => {
         setOnlineCount(Object.keys(channel.presenceState()).length)
       })
-      .subscribe(async (status) => {
+      .subscribe(async (status: string) => {
         if (status === 'SUBSCRIBED') {
           await channel.track({ online_at: new Date().toISOString() })
         }
@@ -131,7 +131,7 @@ export default function LobbyPage() {
       const { data } = await supabase.from('rooms').select('game').eq('status', 'playing')
       if (data) {
         const counts: Partial<Record<GameType, number>> = {}
-        data.forEach(({ game }) => {
+        data.forEach(({ game }: { game: string }) => {
           counts[game as GameType] = (counts[game as GameType] ?? 0) + 1
         })
         setLiveCounts(counts)

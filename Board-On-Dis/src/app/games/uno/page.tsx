@@ -173,31 +173,47 @@ function UnoPage() {
       status={winner ? (winner === 'me' ? 'คุณชนะ! 🎉' : 'แพ้แล้ว...') : aiThinking ? 'AI กำลังคิด...' : myTurn ? 'ตาของคุณ' : 'ตาของ AI'}
       statusColor={winner ? (winner === 'me' ? 'green' : 'red') : myTurn ? 'accent' : 'default'}
       topLeft={<PlayerCard name={playerName} avatar={avatarUrl} label={`ไพ่ในมือ ${hand.length} ใบ`} active={myTurn && !winner} />}
-      topRight={<PlayerCard name="AI" label={`ไพ่ในมือ ${aiHand.length} ใบ`} active={!myTurn && !winner} flip />}
+      topRight={<PlayerCard name="AI" label={`ไพ่ AI ${aiHand.length} ใบ`} active={!myTurn && !winner} flip />}
     >
+      {/* AI card backs (opponent hand) */}
+      <div className="flex justify-center mb-3">
+        <div className="flex flex-wrap gap-1 max-w-xs justify-center">
+          {aiHand.map((_, i) => (
+            <div key={i} className="w-8 h-12 rounded-lg bg-gradient-to-br from-purple/60 to-purple/30 border border-purple/40 flex items-center justify-center text-[9px] font-black text-white/60 shadow-sm flex-shrink-0">
+              UNO
+            </div>
+          ))}
+        </div>
+      </div>
+      {aiHand.length === 1 && (
+        <div className="text-center mb-2">
+          <span className="bg-red/20 border border-red/40 text-red text-xs font-bold px-3 py-1 rounded-full animate-pulse">AI ร้อง UNO!</span>
+        </div>
+      )}
+
       {/* Active color indicator */}
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-3">
         <span className="text-xs text-muted uppercase tracking-widest">สีปัจจุบัน:</span>
         <div className={`w-5 h-5 rounded-full border-2 ${COLOR_BG[activeColor]}`} />
-        <span className="text-xs text-white">{activeColor}</span>
+        <span className="text-xs text-white font-bold">{activeColor}</span>
       </div>
 
       {/* Discard pile */}
-      <div className="flex gap-6 items-center mb-6">
+      <div className="flex gap-6 items-center mb-5">
         <button
           onClick={drawFromDeck}
           disabled={!myTurn || !gameStarted}
           className="flex flex-col items-center gap-1 group"
         >
-          <div className="w-16 h-24 rounded-xl bg-purple/30 border-2 border-purple/40 flex items-center justify-center group-hover:bg-purple/40 transition-colors">
-            <span className="text-2xl">🃏</span>
+          <div className="w-16 h-24 rounded-xl bg-gradient-to-br from-purple/60 to-purple/30 border-2 border-purple/40 flex items-center justify-center group-hover:border-purple/60 transition-colors shadow-lg">
+            <span className="text-2xl font-black text-white/60 text-sm italic">UNO</span>
           </div>
           <span className="text-xs text-muted">{deck.length} ใบ</span>
         </button>
 
         {topCard && (
-          <div className={`w-16 h-24 rounded-xl border-2 flex flex-col items-center justify-center text-white font-bold text-sm ${COLOR_BG[activeColor]} ring-2 ${COLOR_RING[activeColor]}`}>
-            <span className="text-2xl">{topCard.value ?? topCard.type === 'wild4' ? '+4' : topCard.type === 'wild' ? '★' : topCard.type}</span>
+          <div className={`w-16 h-24 rounded-xl border-2 flex flex-col items-center justify-center text-white font-bold shadow-xl ring-4 ${COLOR_BG[activeColor]} ${COLOR_RING[activeColor]}`}>
+            <span className="text-3xl font-black">{topCard.value !== null ? topCard.value : topCard.type === 'wild4' ? '+4' : topCard.type === 'wild' ? '★' : topCard.type === 'draw2' ? '+2' : topCard.type === 'skip' ? '⊘' : '↺'}</span>
           </div>
         )}
       </div>
@@ -209,13 +225,13 @@ function UnoPage() {
           return (
             <motion.button
               key={card.id}
-              whileHover={canPlayCard && myTurn ? { y: -8, scale: 1.05 } : {}}
+              whileHover={canPlayCard && myTurn ? { y: -10, scale: 1.08 } : {}}
               onClick={() => playCard(card)}
-              className={`w-14 h-20 rounded-xl border-2 flex flex-col items-center justify-center text-xs font-bold transition-all ${
+              className={`w-14 h-20 rounded-xl border-2 flex flex-col items-center justify-center font-bold transition-all shadow-md ${
                 COLOR_BG[card.color]
-              } ${canPlayCard && myTurn ? 'cursor-pointer shadow-lg' : 'opacity-50 cursor-default'}`}
+              } ${canPlayCard && myTurn ? 'cursor-pointer shadow-lg ring-2 ring-white/30' : 'opacity-50 cursor-default'}`}
             >
-              <span className="text-lg">{card.value !== null ? card.value : card.type === 'wild4' ? '+4' : card.type === 'draw2' ? '+2' : card.type === 'skip' ? '⊘' : card.type === 'reverse' ? '↺' : '★'}</span>
+              <span className="text-2xl font-black">{card.value !== null ? card.value : card.type === 'wild4' ? '+4' : card.type === 'draw2' ? '+2' : card.type === 'skip' ? '⊘' : card.type === 'reverse' ? '↺' : '★'}</span>
             </motion.button>
           )
         })}
@@ -257,7 +273,7 @@ function UnoPage() {
       </AnimatePresence>
 
       <CoinFlip winner={coinWinner} onDone={() => { setCoinWinner(null); setGameStarted(true) }} />
-      {roomId && <ChatBox roomId={roomId} playerName={playerName} />}
+      {roomId && <ChatBox roomId={roomId} playerName={playerName} playerAvatar={avatarUrl} />}
     </GameLayout>
   )
 }

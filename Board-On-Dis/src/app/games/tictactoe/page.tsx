@@ -40,11 +40,10 @@ function TictactoePage() {
   const { updateRoomState, setRoomStatus } = useGameRoom({
     roomId,
     onStateChange: useCallback((state: Record<string, unknown>) => {
-      if (state.board) setBoard(state.board as Board)
+      if (state.board) { setBoard(state.board as Board); setGameStarted(true) }
       if (state.turn) setCurrentTurn(state.turn as 'X' | 'O')
-      if (state.opponent && opponentName === 'รอผู้เล่น...') setOpponentName(state.opponent as string)
-      if (state.started) { setGameStarted(true) }
-    }, [opponentName]),
+      if (state.opponent) setOpponentName((prev) => prev === 'รอผู้เล่น...' ? state.opponent as string : prev)
+    }, []),
   })
 
   // Coin flip on start
@@ -67,7 +66,7 @@ function TictactoePage() {
   // Load room opponent name
   useEffect(() => {
     if (!isMultiplayer) return
-    supabase.from('rooms').select('players').eq('id', roomId).single().then(({ data }) => {
+    supabase.from('rooms').select('players').eq('id', roomId).single().then(({ data }: { data: { players?: string[] } | null }) => {
       if (data?.players) {
         const opp = data.players.find((p: string) => p !== playerName)
         if (opp) setOpponentName(opp)
@@ -249,7 +248,7 @@ function TictactoePage() {
       )}
 
       <CoinFlip winner={coinWinner} onDone={() => { setCoinWinner(null); setGameStarted(true) }} />
-      {isMultiplayer && roomId && <ChatBox roomId={roomId} playerName={playerName} />}
+      {isMultiplayer && roomId && <ChatBox roomId={roomId} playerName={playerName} playerAvatar={avatarUrl} />}
     </GameLayout>
   )
 }

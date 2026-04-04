@@ -34,10 +34,10 @@ function GomokuPage() {
   const { updateRoomState } = useGameRoom({
     roomId,
     onStateChange: useCallback((state: Record<string, unknown>) => {
-      if (state.board) setBoard(state.board as Board)
+      if (state.board) { setBoard(state.board as Board); setGameStarted(true) }
       if (state.turn) setCurrentTurn(state.turn as 1 | 2)
       if (state.lastMove) setLastMove(state.lastMove as [number, number])
-      if (state.started) setGameStarted(true)
+      if (state.opponent) setOpponentName((prev) => prev === 'รอผู้เล่น...' ? state.opponent as string : prev)
     }, []),
   })
 
@@ -91,7 +91,7 @@ function GomokuPage() {
       sound.move()
       setCurrentTurn(currentTurn === 1 ? 2 : 1)
     }
-    if (roomId) updateRoomState({ board: newBoard, turn: currentTurn === 1 ? 2 : 1, lastMove: [r, c] })
+    if (roomId) updateRoomState({ board: newBoard, turn: currentTurn === 1 ? 2 : 1, lastMove: [r, c], opponent: playerName })
   }
 
   async function saveResult(w: Winner) {
@@ -178,7 +178,7 @@ function GomokuPage() {
       )}
 
       <CoinFlip winner={coinWinner} onDone={() => { setCoinWinner(null); setGameStarted(true) }} />
-      {roomId && <ChatBox roomId={roomId} playerName={playerName} />}
+      {roomId && <ChatBox roomId={roomId} playerName={playerName} playerAvatar={avatarUrl} />}
     </GameLayout>
   )
 }

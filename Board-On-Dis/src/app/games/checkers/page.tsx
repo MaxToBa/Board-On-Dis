@@ -34,9 +34,9 @@ function CheckersPage() {
   const { updateRoomState } = useGameRoom({
     roomId,
     onStateChange: useCallback((state: Record<string, unknown>) => {
-      if (state.board) setBoard(state.board as Board)
+      if (state.board) { setBoard(state.board as Board); setGameStarted(true) }
       if (state.turn) setCurrentTurn(state.turn as 1 | 2)
-      if (state.started) setGameStarted(true)
+      if (state.opponent) setOpponentName((prev) => prev === 'รอผู้เล่น...' ? state.opponent as string : prev)
     }, []),
   })
 
@@ -73,7 +73,7 @@ function CheckersPage() {
     sound.capture()
     if (w) { setWinner(w); if (w === myPlayer) sound.win(); else sound.lose(); saveResult(w) }
     else setCurrentTurn(currentTurn === 1 ? 2 : 1)
-    if (roomId) updateRoomState({ board: newBoard, turn: currentTurn === 1 ? 2 : 1 })
+    if (roomId) updateRoomState({ board: newBoard, turn: currentTurn === 1 ? 2 : 1, opponent: playerName })
   }
 
   function handleCellClick(r: number, c: number) {
@@ -171,7 +171,7 @@ function CheckersPage() {
       )}
 
       <CoinFlip winner={coinWinner} onDone={() => { setCoinWinner(null); setGameStarted(true) }} />
-      {roomId && <ChatBox roomId={roomId} playerName={playerName} />}
+      {roomId && <ChatBox roomId={roomId} playerName={playerName} playerAvatar={avatarUrl} />}
     </GameLayout>
   )
 }

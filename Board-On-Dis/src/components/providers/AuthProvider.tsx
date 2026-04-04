@@ -9,14 +9,14 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const router = useRouter()
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: import('@supabase/supabase-js').Session | null } }) => {
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.user) loadProfile(session.user.id)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (event: string, session: import('@supabase/supabase-js').Session | null) => {
         setSession(session)
         setUser(session?.user ?? null)
         if (session?.user) {

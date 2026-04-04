@@ -43,6 +43,7 @@ export interface Message {
   id: string
   room_id: string
   player_name: string
+  player_avatar?: string | null
   message: string
   created_at: string
 }
