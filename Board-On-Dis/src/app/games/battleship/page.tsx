@@ -292,7 +292,7 @@ function BattleshipPage() {
       )}
 
       <CoinFlip winner={coinWinner} onDone={() => setCoinWinner(null)} />
-      {roomId && <ChatBox roomId={roomId} playerName={playerName} />}
+      {roomId && <ChatBox roomId={roomId} playerName={playerName} playerAvatar={avatarUrl} />}
     </GameLayout>
   )
 }
