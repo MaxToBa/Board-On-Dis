@@ -165,7 +165,7 @@ function UnoPage() {
       const card = playable[Math.floor(Math.random() * playable.length)]
       const newAiHand = aiHand.filter(c => c.id !== card.id)
       const newDiscard = [...discard, card]
-      let newColor = card.color === 'wild' ? (['red','yellow','green','blue'] as Color[])[Math.floor(Math.random()*4)] : card.color
+      const newColor = card.color === 'wild' ? (['red','yellow','green','blue'] as Color[])[Math.floor(Math.random()*4)] : card.color
       setAiHand(newAiHand); setDiscard(newDiscard); setActiveColor(newColor); sound.cardPlay()
 
       if (newAiHand.length === 0) { setWinner('ai'); sound.lose(); saveResult('loss'); setAiThinking(false); return }

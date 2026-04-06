@@ -1,6 +1,5 @@
 'use client'
 import { useState, useEffect, useCallback, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import GameLayout from '@/components/game/GameLayout'
 import PlayerCard from '@/components/game/PlayerCard'
@@ -25,7 +24,6 @@ const CELL_SYMBOLS = { X: '✕', O: '◯' }
 function TictactoePage() {
   const { playerName, avatarUrl, userId, isAuthenticated, roomId, mode, isHost } = usePlayerInfo()
   const { user } = useAuthStore()
-  const params = useSearchParams()
 
   const [board, setBoard] = useState<Board>(Array(9).fill(null))
   const [currentTurn, setCurrentTurn] = useState<'X' | 'O'>('X')

@@ -146,8 +146,8 @@ function BattleshipPage() {
 
   const {
     phase, hostInfo, guestInfo, myInfo, opponentInfo,
-    firstTurn, currentTurn: roomTurn, winner: roomWinner,
-    rematchVotes, isMyTurn: isMyRoomTurn,
+    currentTurn: roomTurn, winner: roomWinner,
+    rematchVotes,
     markReady, updateGameData, finishGame, requestRematch,
   } = useMultiplayerRoom({
     roomId: isMultiplayer ? roomId : '',
