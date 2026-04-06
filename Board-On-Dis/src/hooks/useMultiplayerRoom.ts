@@ -206,16 +206,16 @@ export function useMultiplayerRoom({
     const current = (data?.state as RoomState) ?? roomState
     if (!current) return
 
-    const role = isHost ? 'host' : 'guest'
-    const updated: RoomState = {
-      ...current,
-      [role]: {
-        ...current[role]!,
-        ready: true,
-        color,
-        colorBg: colorBgFromValue(color),
-      },
+    const currentPlayer = isHost ? current.host : (current.guest ?? current.host)
+    const updatedPlayer: PlayerInRoom = {
+      ...currentPlayer,
+      ready: true,
+      color,
+      colorBg: colorBgFromValue(color),
     }
+    const updated: RoomState = isHost
+      ? { ...current, host: updatedPlayer }
+      : { ...current, guest: updatedPlayer }
 
     const otherReady = isHost
       ? (updated.guest?.ready ?? false)
