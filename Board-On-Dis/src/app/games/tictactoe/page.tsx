@@ -7,18 +7,23 @@ import PlayerCard from '@/components/game/PlayerCard'
 import RoomCode from '@/components/game/RoomCode'
 import CoinFlip from '@/components/game/CoinFlip'
 import ChatBox from '@/components/game/ChatBox'
+import WaitingRoom from '@/components/game/phases/WaitingRoom'
+import SetupRoom from '@/components/game/phases/SetupRoom'
+import GameResult from '@/components/game/phases/GameResult'
+import Confetti from '@/components/ui/Confetti'
 import { usePlayerInfo } from '@/hooks/usePlayerInfo'
-import { useGameRoom } from '@/hooks/useGameRoom'
+import { useMultiplayerRoom } from '@/hooks/useMultiplayerRoom'
 import { checkWinner, getAvailableMoves, getWinLine } from '@/lib/games/tictactoe'
 import { sound } from '@/lib/sound'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
+import { COLOR_OPTIONS } from '@/types/room'
 import type { Board, Winner } from '@/lib/games/tictactoe'
 
 const CELL_SYMBOLS = { X: '✕', O: '◯' }
 
 function TictactoePage() {
-  const { playerName, avatarUrl, isAuthenticated, roomId, mode, isHost } = usePlayerInfo()
+  const { playerName, avatarUrl, userId, isAuthenticated, roomId, mode, isHost } = usePlayerInfo()
   const { user } = useAuthStore()
   const params = useSearchParams()
 
@@ -29,50 +34,61 @@ function TictactoePage() {
   const [coinWinner, setCoinWinner] = useState<string | null>(null)
   const [gameStarted, setGameStarted] = useState(false)
   const [mySymbol, setMySymbol] = useState<'X' | 'O'>('X')
-  const [opponentName, setOpponentName] = useState('รอผู้เล่น...')
   const [aiThinking, setAiThinking] = useState(false)
   const [scores, setScores] = useState({ X: 0, O: 0 })
+  const [selectedColor, setSelectedColor] = useState('purple')
 
   const isMultiplayer = mode === 'multiplayer' && !!roomId
-  const isMyTurn = !winner && (mode === 'ai' ? currentTurn === 'X' : currentTurn === mySymbol)
 
-  // Multiplayer room sync
-  const { updateRoomState, setRoomStatus } = useGameRoom({
-    roomId,
-    onStateChange: useCallback((state: Record<string, unknown>) => {
+  // Multiplayer room hook
+  const {
+    phase, hostInfo, guestInfo, myInfo, opponentInfo,
+    firstTurn, currentTurn: roomTurn, winner: roomWinner,
+    rematchVotes, isMyTurn: isMyRoomTurn, myPlayerNum,
+    markReady, updateGameData, finishGame, requestRematch,
+  } = useMultiplayerRoom({
+    roomId: isMultiplayer ? roomId : '',
+    isHost,
+    playerName,
+    avatarUrl,
+    userId,
+    onGameStateChange: useCallback((state: Record<string, unknown>) => {
       if (state.board) { setBoard(state.board as Board); setGameStarted(true) }
-      if (state.turn) setCurrentTurn(state.turn as 'X' | 'O')
-      if (state.opponent) setOpponentName((prev) => prev === 'รอผู้เล่น...' ? state.opponent as string : prev)
+      if (state.currentGameTurn) setCurrentTurn(state.currentGameTurn as 'X' | 'O')
     }, []),
   })
 
-  // Coin flip on start
-  useEffect(() => {
-    if (gameStarted) return
-    const flip = Math.random() < 0.5
-    if (mode === 'ai') {
-      const first = flip ? playerName : 'AI'
-      setMySymbol('X')
-      setTimeout(() => { setCoinWinner(first) }, 300)
-    } else if (isHost) {
-      const myFirst = flip
-      setMySymbol(myFirst ? 'X' : 'O')
-      setTimeout(() => { setCoinWinner(playerName) }, 300)
-    } else {
-      setMySymbol('O')
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Load room opponent name
+  // Set mySymbol when firstTurn resolves
   useEffect(() => {
     if (!isMultiplayer) return
-    supabase.from('rooms').select('players').eq('id', roomId).single().then(({ data }: { data: { players?: string[] } | null }) => {
-      if (data?.players) {
-        const opp = data.players.find((p: string) => p !== playerName)
-        if (opp) setOpponentName(opp)
-      }
-    })
-  }, [roomId, playerName, isMultiplayer])
+    if (firstTurn) {
+      setMySymbol(myPlayerNum === 1 ? 'X' : 'O')
+    }
+  }, [firstTurn, myPlayerNum, isMultiplayer])
+
+  // Show coin flip animation when phase changes to coin_flip
+  useEffect(() => {
+    if (!isMultiplayer || phase !== 'coin_flip') return
+    if (!hostInfo || !guestInfo) return
+    const firstPlayerName = roomTurn === 'host' ? hostInfo.name : guestInfo.name
+    setCoinWinner(firstPlayerName)
+  }, [phase, isMultiplayer]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When phase moves to playing (after coin flip), start game
+  useEffect(() => {
+    if (!isMultiplayer || phase !== 'playing') return
+    if (!gameStarted && coinWinner) {
+      // coinWinner is still shown, CoinFlip.onDone will set gameStarted
+    }
+  }, [phase, isMultiplayer]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // AI: solo coin flip
+  useEffect(() => {
+    if (mode !== 'ai' || gameStarted) return
+    const flip = Math.random() < 0.5
+    setMySymbol('X')
+    setTimeout(() => setCoinWinner(flip ? playerName : 'AI'), 300)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // AI move
   useEffect(() => {
@@ -100,8 +116,9 @@ function TictactoePage() {
 
   function handleCellClick(index: number, isAI = false) {
     if (board[index] || winner) return
-    if (!isAI && !isMyTurn) return
-    if (!gameStarted && mode !== 'ai') return
+    if (!gameStarted) return
+    if (isMultiplayer && !isMyRoomTurn) return
+    if (!isAI && mode === 'ai' && currentTurn !== mySymbol) return
 
     const newBoard = [...board]
     newBoard[index] = currentTurn
@@ -110,107 +127,188 @@ function TictactoePage() {
 
     setBoard(newBoard)
     setWinLine(wl)
+
     if (w) {
       setWinner(w)
       if (w !== 'draw') {
-        setScores((s) => ({ ...s, [w]: s[w as 'X' | 'O'] + 1 }))
+        setScores((s) => ({ ...s, [w]: (s[w as 'X' | 'O'] ?? 0) + 1 }))
         if (w === mySymbol) sound.win()
         else sound.lose()
       } else {
         sound.draw()
       }
       saveResult(w)
+      if (isMultiplayer) {
+        const roomWin = w === 'draw' ? 'draw' : w === mySymbol ? (isHost ? 'host' : 'guest') : (isHost ? 'guest' : 'host')
+        finishGame(roomWin as 'host' | 'guest' | 'draw')
+      }
     } else {
       sound.move()
-      setCurrentTurn(currentTurn === 'X' ? 'O' : 'X')
-    }
-
-    if (isMultiplayer) {
-      updateRoomState({ board: newBoard, turn: currentTurn === 'X' ? 'O' : 'X', opponent: playerName })
-      if (w) setRoomStatus('finished')
+      const nextTurn = currentTurn === 'X' ? 'O' : 'X'
+      setCurrentTurn(nextTurn)
+      if (isMultiplayer) {
+        const nextRoomTurn = isHost ? 'guest' : 'host'
+        updateGameData({
+          board: newBoard,
+          currentGameTurn: nextTurn,
+          currentTurn: nextRoomTurn,
+        })
+      }
     }
   }
 
   async function saveResult(w: Winner) {
-    if (!isAuthenticated || !user) return
+    if (!isAuthenticated || !user || !w) return
     const result = w === 'draw' ? 'draw' : w === mySymbol ? 'win' : 'loss'
     await supabase.from('game_results').insert({
       user_id: user.id,
       player_name: playerName,
       game: 'tictactoe',
       result,
-      opponent: mode === 'ai' ? 'AI' : opponentName,
+      opponent: mode === 'ai' ? 'AI' : (opponentInfo?.name ?? 'เพื่อน'),
       score: 0,
       best_tile: 0,
       time_played: 0,
     })
   }
 
-  function resetGame() {
+  function resetAiGame() {
     setBoard(Array(9).fill(null))
     setWinner(null)
     setWinLine(null)
     setCurrentTurn('X')
-    if (isMultiplayer) updateRoomState({ board: Array(9).fill(null), turn: 'X' })
+    setGameStarted(false)
+    const flip = Math.random() < 0.5
+    setTimeout(() => setCoinWinner(flip ? playerName : 'AI'), 300)
   }
 
+  function handleRematch() {
+    requestRematch({ board: Array(9).fill(null), currentGameTurn: 'X', currentTurn: 'host' })
+  }
+
+  // Compute status text
+  const isMyActiveTurn = isMultiplayer ? isMyRoomTurn : currentTurn === mySymbol
+  const opponentName = isMultiplayer ? (opponentInfo?.name ?? 'รอผู้เล่น...') : 'AI (Claude)'
   const statusText = winner
-    ? winner === 'draw'
-      ? 'เสมอ!'
-      : winner === mySymbol
-      ? 'คุณชนะ! 🎉'
-      : 'แพ้แล้ว...'
-    : aiThinking
-    ? 'AI กำลังคิด...'
-    : isMyTurn
-    ? 'ตาของคุณ'
+    ? winner === 'draw' ? 'เสมอ!' : winner === mySymbol ? 'คุณชนะ! 🎉' : 'แพ้แล้ว...'
+    : aiThinking ? 'AI กำลังคิด...'
+    : isMyActiveTurn ? 'ตาของคุณ'
     : 'รอผู้เล่นอีกฝั่ง'
 
-  const opponent = mode === 'ai' ? 'AI (Claude)' : opponentName
+  // ---- MULTIPLAYER PHASE RENDERING ----
+  if (isMultiplayer) {
+    // Waiting room
+    if (phase === 'waiting' && isHost) {
+      return (
+        <GameLayout title="โอ-ซี">
+          <WaitingRoom roomCode={roomId} />
+        </GameLayout>
+      )
+    }
+
+    // Setup (both players present, choose color)
+    if (phase === 'setup' || (phase === 'waiting' && !isHost)) {
+      return (
+        <GameLayout title="โอ-ซี">
+          <SetupRoom
+            myInfo={myInfo ?? null}
+            opponentInfo={opponentInfo ?? null}
+            colorOptions={COLOR_OPTIONS}
+            selectedColor={selectedColor}
+            onSelectColor={setSelectedColor}
+            onReady={() => markReady(selectedColor)}
+          />
+        </GameLayout>
+      )
+    }
+
+    // Coin flip phase
+    if (phase === 'coin_flip') {
+      const firstPlayerName = roomTurn === 'host' ? (hostInfo?.name ?? '') : (guestInfo?.name ?? '')
+      return (
+        <GameLayout title="โอ-ซี">
+          <CoinFlip
+            winner={firstPlayerName}
+            onDone={() => { setCoinWinner(null); setGameStarted(true) }}
+          />
+          {/* Show blank board behind */}
+          <div className="opacity-0 pointer-events-none grid grid-cols-3 gap-3 w-full max-w-xs mx-auto">
+            {Array(9).fill(null).map((_, i) => (
+              <div key={i} className="aspect-square" />
+            ))}
+          </div>
+        </GameLayout>
+      )
+    }
+  }
+
+  // ---- GAME BOARD RENDERING (playing + finished + AI) ----
+  const confettiWinner = isMultiplayer
+    ? roomWinner !== 'draw' && roomWinner === (isHost ? 'host' : 'guest')
+    : winner !== 'draw' && winner === mySymbol
 
   return (
     <GameLayout
       title="โอ-ซี"
       status={statusText}
-      statusColor={winner ? (winner === mySymbol ? 'green' : winner === 'draw' ? 'default' : 'red') : 'accent'}
+      statusColor={
+        winner
+          ? winner === mySymbol ? 'green' : winner === 'draw' ? 'default' : 'red'
+          : 'accent'
+      }
       topLeft={
         <PlayerCard
-          name={playerName}
-          avatar={avatarUrl}
-          label={`ผู้เล่น (${mySymbol})`}
-          active={currentTurn === mySymbol && !winner}
-          score={scores[mySymbol]}
+          name={isMultiplayer ? (hostInfo?.name ?? playerName) : playerName}
+          avatar={isMultiplayer ? hostInfo?.avatarUrl : avatarUrl}
+          label={`ผู้เล่น (${isHost ? mySymbol : (mySymbol === 'X' ? 'O' : 'X')})`}
+          active={isMultiplayer ? roomTurn === 'host' && !winner : currentTurn === (isHost ? mySymbol : (mySymbol === 'X' ? 'O' : 'X')) && !winner}
+          score={isMultiplayer ? hostInfo?.score : scores[isHost ? mySymbol : (mySymbol === 'X' ? 'O' : 'X')]}
         />
       }
       topRight={
         <div className="flex flex-col items-end gap-2">
           <PlayerCard
-            name={opponent}
-            label={`ฝ่ายตรงข้าม (${mySymbol === 'X' ? 'O' : 'X'})`}
-            active={currentTurn !== mySymbol && !winner}
-            score={scores[mySymbol === 'X' ? 'O' : 'X']}
+            name={isMultiplayer ? (guestInfo?.name ?? 'รอผู้เล่น...') : opponentName}
+            avatar={isMultiplayer ? guestInfo?.avatarUrl : undefined}
+            label={`ฝ่ายตรงข้าม (${isHost ? (mySymbol === 'X' ? 'O' : 'X') : mySymbol})`}
+            active={isMultiplayer ? roomTurn === 'guest' && !winner : currentTurn !== mySymbol && !winner}
+            score={isMultiplayer ? guestInfo?.score : scores[isHost ? (mySymbol === 'X' ? 'O' : 'X') : mySymbol]}
             flip
           />
           {isMultiplayer && roomId && <RoomCode code={roomId} />}
         </div>
       }
     >
+      {/* Game Result Overlay */}
+      {isMultiplayer && phase === 'finished' && roomWinner && hostInfo && guestInfo && (
+        <GameResult
+          winner={roomWinner}
+          hostInfo={hostInfo}
+          guestInfo={guestInfo}
+          myName={playerName}
+          rematchVotes={rematchVotes}
+          onRematch={handleRematch}
+        />
+      )}
+      <Confetti active={!!winner && confettiWinner && (mode === 'ai' || phase === 'finished')} />
+
       {/* Board */}
       <div className="grid grid-cols-3 gap-3 w-full max-w-xs mx-auto">
         {board.map((cell, i) => {
           const isWinCell = winLine?.includes(i)
+          const canClick = !cell && !winner && gameStarted && (isMultiplayer ? isMyRoomTurn : currentTurn === mySymbol)
           return (
             <motion.button
               key={i}
-              whileHover={!cell && isMyTurn && !winner ? { scale: 1.05 } : {}}
-              whileTap={!cell && isMyTurn && !winner ? { scale: 0.95 } : {}}
+              whileHover={canClick ? { scale: 1.05 } : {}}
+              whileTap={canClick ? { scale: 0.95 } : {}}
               onClick={() => handleCellClick(i)}
               className={`aspect-square rounded-2xl border-2 text-4xl font-bold flex items-center justify-center transition-all ${
                 isWinCell
                   ? 'border-accent bg-accent/20'
                   : cell
                   ? 'border-white/20 bg-surface'
-                  : isMyTurn && !winner
+                  : canClick
                   ? 'border-white/10 bg-surface hover:border-white/30 hover:bg-surface2 cursor-pointer'
                   : 'border-white/10 bg-surface cursor-default'
               }`}
@@ -231,15 +329,11 @@ function TictactoePage() {
         })}
       </div>
 
-      {/* Result actions */}
-      {winner && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-6 flex gap-3"
-        >
+      {/* AI result actions */}
+      {winner && mode === 'ai' && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mt-6 flex gap-3">
           <button
-            onClick={resetGame}
+            onClick={resetAiGame}
             className="bg-accent text-bg px-6 py-2 rounded-full font-bold text-sm hover:brightness-110 transition-all"
           >
             เล่นอีกครั้ง

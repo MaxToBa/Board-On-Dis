@@ -6,46 +6,71 @@ import PlayerCard from '@/components/game/PlayerCard'
 import RoomCode from '@/components/game/RoomCode'
 import CoinFlip from '@/components/game/CoinFlip'
 import ChatBox from '@/components/game/ChatBox'
+import WaitingRoom from '@/components/game/phases/WaitingRoom'
+import SetupRoom from '@/components/game/phases/SetupRoom'
+import GameResult from '@/components/game/phases/GameResult'
+import Confetti from '@/components/ui/Confetti'
 import { usePlayerInfo } from '@/hooks/usePlayerInfo'
-import { useGameRoom } from '@/hooks/useGameRoom'
+import { useMultiplayerRoom } from '@/hooks/useMultiplayerRoom'
 import { emptyBoard, dropPiece, checkWinner, getAvailableCols, ROWS, COLS } from '@/lib/games/connect-four'
 import { sound } from '@/lib/sound'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
+import { COLOR_OPTIONS } from '@/types/room'
 import type { Board, Winner } from '@/lib/games/connect-four'
 
 function ConnectFourPage() {
-  const { playerName, avatarUrl, isAuthenticated, roomId, mode, isHost } = usePlayerInfo()
+  const { playerName, avatarUrl, userId, isAuthenticated, roomId, mode, isHost } = usePlayerInfo()
   const { user } = useAuthStore()
   const [board, setBoard] = useState<Board>(emptyBoard())
   const [currentTurn, setCurrentTurn] = useState<1 | 2>(1)
   const [winner, setWinner] = useState<Winner>(null)
   const [myPlayer, setMyPlayer] = useState<1 | 2>(1)
-  const [opponentName, setOpponentName] = useState('รอผู้เล่น...')
   const [coinWinner, setCoinWinner] = useState<string | null>(null)
   const [gameStarted, setGameStarted] = useState(false)
   const [hoverCol, setHoverCol] = useState<number | null>(null)
   const [aiThinking, setAiThinking] = useState(false)
+  const [selectedColor, setSelectedColor] = useState('red')
 
-  const isMyTurn = !winner && (mode === 'ai' ? currentTurn === 1 : currentTurn === myPlayer)
+  const isMultiplayer = mode === 'multiplayer' && !!roomId
 
-  const { updateRoomState } = useGameRoom({
-    roomId,
-    onStateChange: useCallback((state: Record<string, unknown>) => {
+  const {
+    phase, hostInfo, guestInfo, myInfo, opponentInfo,
+    firstTurn, currentTurn: roomTurn, winner: roomWinner,
+    rematchVotes, isMyTurn: isMyRoomTurn, myPlayerNum,
+    markReady, updateGameData, finishGame, requestRematch,
+  } = useMultiplayerRoom({
+    roomId: isMultiplayer ? roomId : '',
+    isHost,
+    playerName,
+    avatarUrl,
+    userId,
+    onGameStateChange: useCallback((state: Record<string, unknown>) => {
       if (state.board) { setBoard(state.board as Board); setGameStarted(true) }
-      if (state.turn) setCurrentTurn(state.turn as 1 | 2)
-      if (state.opponent) setOpponentName((prev) => prev === 'รอผู้เล่น...' ? state.opponent as string : prev)
+      if (state.currentGameTurn) setCurrentTurn(state.currentGameTurn as 1 | 2)
     }, []),
   })
 
   useEffect(() => {
-    if (gameStarted) return
+    if (!isMultiplayer || !firstTurn) return
+    setMyPlayer(myPlayerNum)
+  }, [firstTurn, myPlayerNum, isMultiplayer])
+
+  useEffect(() => {
+    if (!isMultiplayer || phase !== 'coin_flip' || !hostInfo || !guestInfo) return
+    const firstPlayerName = roomTurn === 'host' ? hostInfo.name : guestInfo.name
+    setCoinWinner(firstPlayerName)
+  }, [phase, isMultiplayer]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // AI mode: coin flip
+  useEffect(() => {
+    if (mode !== 'ai' || gameStarted) return
     const flip = Math.random() < 0.5
-    if (mode === 'ai') { setMyPlayer(1); setTimeout(() => setCoinWinner(flip ? playerName : 'AI'), 300) }
-    else if (isHost) { setMyPlayer(flip ? 1 : 2); setTimeout(() => setCoinWinner(playerName), 300) }
-    else setMyPlayer(2)
+    setMyPlayer(1)
+    setTimeout(() => setCoinWinner(flip ? playerName : 'AI'), 300)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // AI move
   useEffect(() => {
     if (mode !== 'ai' || currentTurn !== 2 || winner || !gameStarted) return
     setAiThinking(true)
@@ -67,22 +92,33 @@ function ConnectFourPage() {
 
   function handleDrop(col: number, isAI = false) {
     if (winner) return
-    if (!isAI && !isMyTurn) return
-    if (!gameStarted && mode !== 'ai') return
+    if (!gameStarted) return
+    if (isMultiplayer && !isMyRoomTurn) return
+    if (!isAI && mode === 'ai' && currentTurn !== myPlayer) return
+
     const newBoard = dropPiece(board, col, currentTurn)
     if (!newBoard) return
     const w = checkWinner(newBoard)
     setBoard(newBoard)
     sound.drop()
+
     if (w) {
       setWinner(w)
       if (w !== 'draw') { if (w === myPlayer) sound.win(); else sound.lose() }
       else sound.draw()
       saveResult(w)
+      if (isMultiplayer) {
+        const roomWin = w === 'draw' ? 'draw' : w === myPlayer ? (isHost ? 'host' : 'guest') : (isHost ? 'guest' : 'host')
+        finishGame(roomWin as 'host' | 'guest' | 'draw')
+      }
     } else {
-      setCurrentTurn(currentTurn === 1 ? 2 : 1)
+      const nextTurn: 1 | 2 = currentTurn === 1 ? 2 : 1
+      setCurrentTurn(nextTurn)
+      if (isMultiplayer) {
+        const nextRoomTurn = isHost ? 'guest' : 'host'
+        updateGameData({ board: newBoard, currentGameTurn: nextTurn, currentTurn: nextRoomTurn })
+      }
     }
-    if (roomId) updateRoomState({ board: newBoard, turn: currentTurn === 1 ? 2 : 1, opponent: playerName })
   }
 
   async function saveResult(w: Winner) {
@@ -90,33 +126,104 @@ function ConnectFourPage() {
     await supabase.from('game_results').insert({
       user_id: user.id, player_name: playerName, game: 'connect-four',
       result: w === 'draw' ? 'draw' : w === myPlayer ? 'win' : 'loss',
-      opponent: mode === 'ai' ? 'AI' : opponentName, score: 0, best_tile: 0, time_played: 0,
+      opponent: mode === 'ai' ? 'AI' : (opponentInfo?.name ?? 'เพื่อน'),
+      score: 0, best_tile: 0, time_played: 0,
     })
   }
 
-  const colors = ['', 'bg-red', 'bg-accent']
-  const opponent = mode === 'ai' ? 'AI (Claude)' : opponentName
+  function handleRematch() {
+    requestRematch({ board: emptyBoard(), currentGameTurn: 1, currentTurn: 'host' })
+  }
+
+  // Color dots: player1 = red, player2 = yellow
+  const myColor = myPlayer === 1 ? 'bg-red' : 'bg-accent'
+  const oppColor = myPlayer === 1 ? 'bg-accent' : 'bg-red'
+  const isMyActiveTurn = isMultiplayer ? isMyRoomTurn : !winner && currentTurn === myPlayer
+  const opponentName = isMultiplayer ? (opponentInfo?.name ?? 'รอผู้เล่น...') : 'AI (Claude)'
+
+  // ---- MULTIPLAYER PHASE RENDERING ----
+  if (isMultiplayer) {
+    if (phase === 'waiting' && isHost) {
+      return <GameLayout title="Connect Four"><WaitingRoom roomCode={roomId} /></GameLayout>
+    }
+    if (phase === 'setup' || (phase === 'waiting' && !isHost)) {
+      return (
+        <GameLayout title="Connect Four">
+          <SetupRoom
+            myInfo={myInfo ?? null}
+            opponentInfo={opponentInfo ?? null}
+            colorOptions={COLOR_OPTIONS}
+            selectedColor={selectedColor}
+            onSelectColor={setSelectedColor}
+            onReady={() => markReady(selectedColor)}
+          />
+        </GameLayout>
+      )
+    }
+    if (phase === 'coin_flip') {
+      const firstPlayerName = roomTurn === 'host' ? (hostInfo?.name ?? '') : (guestInfo?.name ?? '')
+      return (
+        <GameLayout title="Connect Four">
+          <CoinFlip winner={firstPlayerName} onDone={() => { setCoinWinner(null); setGameStarted(true) }} />
+        </GameLayout>
+      )
+    }
+  }
+
+  const confettiWinner = isMultiplayer
+    ? roomWinner !== 'draw' && roomWinner === (isHost ? 'host' : 'guest')
+    : winner !== null && winner !== 'draw' && winner === myPlayer
 
   return (
     <GameLayout
       title="Connect Four"
-      status={winner ? (winner === 'draw' ? 'เสมอ!' : winner === myPlayer ? 'คุณชนะ! 🎉' : 'แพ้แล้ว...') : aiThinking ? 'AI กำลังคิด...' : isMyTurn ? 'ตาของคุณ' : 'รอคู่ต่อสู้'}
+      status={
+        winner
+          ? winner === 'draw' ? 'เสมอ!' : winner === myPlayer ? 'คุณชนะ! 🎉' : 'แพ้แล้ว...'
+          : aiThinking ? 'AI กำลังคิด...'
+          : isMyActiveTurn ? 'ตาของคุณ' : 'รอคู่ต่อสู้'
+      }
       statusColor={winner ? (winner === 'draw' ? 'default' : winner === myPlayer ? 'green' : 'red') : 'accent'}
-      topLeft={<PlayerCard name={playerName} avatar={avatarUrl} label={`คุณ (${myPlayer === 1 ? '🔴' : '🟡'})`} active={currentTurn === myPlayer && !winner} />}
+      topLeft={
+        <PlayerCard
+          name={isMultiplayer ? (hostInfo?.name ?? playerName) : playerName}
+          avatar={isMultiplayer ? hostInfo?.avatarUrl : avatarUrl}
+          label={`คุณ (${myPlayer === 1 ? '🔴' : '🟡'})`}
+          active={isMultiplayer ? roomTurn === 'host' && !winner : currentTurn === myPlayer && !winner}
+        />
+      }
       topRight={
         <div className="flex flex-col items-end gap-2">
-          <PlayerCard name={opponent} label={`ฝ่ายตรงข้าม (${myPlayer === 1 ? '🟡' : '🔴'})`} active={currentTurn !== myPlayer && !winner} flip />
-          {roomId && <RoomCode code={roomId} />}
+          <PlayerCard
+            name={isMultiplayer ? (guestInfo?.name ?? 'รอผู้เล่น...') : opponentName}
+            avatar={isMultiplayer ? guestInfo?.avatarUrl : undefined}
+            label={`ฝ่ายตรงข้าม (${myPlayer === 1 ? '🟡' : '🔴'})`}
+            active={isMultiplayer ? roomTurn === 'guest' && !winner : currentTurn !== myPlayer && !winner}
+            flip
+          />
+          {isMultiplayer && roomId && <RoomCode code={roomId} />}
         </div>
       }
     >
+      {isMultiplayer && phase === 'finished' && roomWinner && hostInfo && guestInfo && (
+        <GameResult
+          winner={roomWinner}
+          hostInfo={hostInfo}
+          guestInfo={guestInfo}
+          myName={playerName}
+          rematchVotes={rematchVotes}
+          onRematch={handleRematch}
+        />
+      )}
+      <Confetti active={!!winner && confettiWinner && (mode === 'ai' || phase === 'finished')} />
+
       <div className="bg-surface2 border border-white/10 rounded-2xl p-3 overflow-auto">
-        {/* Column hover indicators */}
+        {/* Drop indicators */}
         <div className="flex gap-2 mb-1">
           {Array.from({ length: COLS }).map((_, c) => (
             <div key={c} className="w-10 h-4 flex items-center justify-center">
-              {hoverCol === c && isMyTurn && (
-                <motion.div initial={{ y: -4 }} animate={{ y: 0 }} className={`w-4 h-4 rounded-full ${myPlayer === 1 ? 'bg-red' : 'bg-accent'}`} />
+              {hoverCol === c && isMyActiveTurn && !winner && (
+                <motion.div initial={{ y: -4 }} animate={{ y: 0 }} className={`w-4 h-4 rounded-full ${myColor}`} />
               )}
             </div>
           ))}
@@ -131,7 +238,9 @@ function ConnectFourPage() {
                 <motion.div
                   key={`${r}-${c}`}
                   className={`w-10 h-10 rounded-full border-2 cursor-pointer transition-colors ${
-                    cell ? `${colors[cell]} border-transparent` : 'border-white/10 bg-surface hover:border-white/20'
+                    cell === 1 ? 'bg-red border-transparent'
+                    : cell === 2 ? 'bg-accent border-transparent'
+                    : 'border-white/10 bg-surface hover:border-white/20'
                   }`}
                   onMouseEnter={() => setHoverCol(c)}
                   onMouseLeave={() => setHoverCol(null)}
@@ -145,10 +254,10 @@ function ConnectFourPage() {
         </div>
       </div>
 
-      {winner && (
+      {winner && mode === 'ai' && (
         <motion.button
           initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-          onClick={() => { setBoard(emptyBoard()); setWinner(null); setCurrentTurn(1) }}
+          onClick={() => { setBoard(emptyBoard()); setWinner(null); setCurrentTurn(1); setGameStarted(false); setTimeout(() => setCoinWinner(Math.random() < 0.5 ? playerName : 'AI'), 300) }}
           className="mt-4 bg-accent text-bg px-6 py-2 rounded-full font-bold text-sm hover:brightness-110"
         >
           เล่นอีกครั้ง
@@ -156,7 +265,7 @@ function ConnectFourPage() {
       )}
 
       <CoinFlip winner={coinWinner} onDone={() => { setCoinWinner(null); setGameStarted(true) }} />
-      {roomId && <ChatBox roomId={roomId} playerName={playerName} playerAvatar={avatarUrl} />}
+      {isMultiplayer && roomId && <ChatBox roomId={roomId} playerName={playerName} playerAvatar={avatarUrl} />}
     </GameLayout>
   )
 }

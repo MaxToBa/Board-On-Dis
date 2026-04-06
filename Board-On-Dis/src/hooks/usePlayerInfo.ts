@@ -17,10 +17,11 @@ export function usePlayerInfo() {
     'Player'
 
   const avatarUrl = profile?.avatar_url ?? user?.user_metadata?.avatar_url ?? null
+  const userId = user?.id ?? null
   const isAuthenticated = !!user
   const roomId = params.get('room') ?? ''
   const mode = (params.get('mode') ?? 'multiplayer') as 'ai' | 'solo' | 'multiplayer'
   const isHost = params.get('host') === '1'
 
-  return { playerName, avatarUrl, isAuthenticated, roomId, mode, isHost }
+  return { playerName, avatarUrl, userId, isAuthenticated, roomId, mode, isHost }
 }
