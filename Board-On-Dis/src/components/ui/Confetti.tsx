@@ -7,7 +7,7 @@ interface ConfettiProps {
 
 export default function Confetti({ active }: ConfettiProps) {
   const ref = useRef<HTMLCanvasElement>(null)
-  const animRef = useRef<number>()
+  const animRef = useRef<number | undefined>(undefined)
   const aliveRef = useRef(false)
 
   useEffect(() => {
