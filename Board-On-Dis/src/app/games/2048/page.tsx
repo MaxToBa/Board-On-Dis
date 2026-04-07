@@ -5,8 +5,7 @@ import GameLayout from '@/components/game/GameLayout'
 import { usePlayerInfo } from '@/hooks/usePlayerInfo'
 import { emptyBoard, addRandomTile, move as moveBoard, isGameOver, getBestTile } from '@/lib/games/game-2048'
 import { sound } from '@/lib/sound'
-import { supabase } from '@/lib/supabase'
-import { useAuthStore } from '@/store/auth'
+import { saveGameResult } from '@/lib/saveGameResult'
 import type { Board, Direction } from '@/lib/games/game-2048'
 
 const TILE_COLORS: Record<number, { bg: string; text: string; shadow?: string }> = {
@@ -25,8 +24,7 @@ const TILE_COLORS: Record<number, { bg: string; text: string; shadow?: string }>
 }
 
 function Game2048Page() {
-  const { playerName, isAuthenticated } = usePlayerInfo()
-  const { user } = useAuthStore()
+  const { playerName, userId, isAuthenticated } = usePlayerInfo()
   const [board, setBoard] = useState<Board>(() => addRandomTile(addRandomTile(emptyBoard())))
   const [score, setScore] = useState(0)
   const [best, setBest] = useState(0)
@@ -86,13 +84,14 @@ function Game2048Page() {
     return () => { window.removeEventListener('touchstart', onStart); window.removeEventListener('touchend', onEnd) }
   }, [handleKey])
 
-  async function saveResult(b: Board, finalScore: number) {
-    if (!isAuthenticated || !user) return
-    await supabase.from('game_results').insert({
-      user_id: user.id, player_name: playerName, game: '2048',
+  function saveResult(b: Board, finalScore: number) {
+    if (!isAuthenticated || !userId) return
+    saveGameResult({
+      userId, playerName, game: '2048',
       result: getBestTile(b) >= 2048 ? 'win' : 'loss',
-      opponent: 'Solo', score: finalScore, best_tile: getBestTile(b),
-      time_played: Math.floor((Date.now() - startTime) / 1000),
+      opponent: 'Solo', isBot: false,
+      score: finalScore, bestTile: getBestTile(b),
+      timePlayed: Math.floor((Date.now() - startTime) / 1000),
     })
   }
 

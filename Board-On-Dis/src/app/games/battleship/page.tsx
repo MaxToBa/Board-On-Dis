@@ -14,8 +14,7 @@ import { usePlayerInfo } from '@/hooks/usePlayerInfo'
 import { useMultiplayerRoom } from '@/hooks/useMultiplayerRoom'
 import { emptyGrid, fireShot, checkAllSunk, randomPlacement } from '@/lib/games/battleship'
 import { sound } from '@/lib/sound'
-import { supabase } from '@/lib/supabase'
-import { useAuthStore } from '@/store/auth'
+import { saveGameResult } from '@/lib/saveGameResult'
 import { COLOR_OPTIONS } from '@/types/room'
 import type { Grid, Ship } from '@/lib/games/battleship'
 
@@ -117,7 +116,6 @@ function PlacementGrid({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 function BattleshipPage() {
   const { playerName, avatarUrl, userId, isAuthenticated, roomId, mode, isHost } = usePlayerInfo()
-  const { user } = useAuthStore()
 
   // My fleet
   const [myGrid, setMyGrid]   = useState<Grid>(emptyGrid())
@@ -282,12 +280,11 @@ function BattleshipPage() {
     }
   }
 
-  async function saveResult(result:'win'|'loss'){
-    if(!isAuthenticated||!user) return
-    await supabase.from('game_results').insert({
-      user_id:user.id, player_name:playerName, game:'battleship',
-      result, opponent:mode==='ai'?'AI':(opponentInfo?.name??'เพื่อน'),
-      score:0, best_tile:0, time_played:0,
+  function saveResult(result:'win'|'loss'){
+    if(!isAuthenticated||!userId) return
+    saveGameResult({
+      userId, playerName, game:'battleship', result,
+      opponent:mode==='ai'?'AI':(opponentInfo?.name??'เพื่อน'),
     })
   }
 

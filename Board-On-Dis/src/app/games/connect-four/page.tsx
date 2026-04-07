@@ -14,14 +14,12 @@ import { usePlayerInfo } from '@/hooks/usePlayerInfo'
 import { useMultiplayerRoom } from '@/hooks/useMultiplayerRoom'
 import { emptyBoard, dropPiece, checkWinner, getAvailableCols, ROWS, COLS } from '@/lib/games/connect-four'
 import { sound } from '@/lib/sound'
-import { supabase } from '@/lib/supabase'
-import { useAuthStore } from '@/store/auth'
+import { saveGameResult } from '@/lib/saveGameResult'
 import { COLOR_OPTIONS } from '@/types/room'
 import type { Board, Winner } from '@/lib/games/connect-four'
 
 function ConnectFourPage() {
   const { playerName, avatarUrl, userId, isAuthenticated, roomId, mode, isHost } = usePlayerInfo()
-  const { user } = useAuthStore()
   const [board, setBoard] = useState<Board>(emptyBoard())
   const [currentTurn, setCurrentTurn] = useState<1 | 2>(1)
   const [winner, setWinner] = useState<Winner>(null)
@@ -121,13 +119,12 @@ function ConnectFourPage() {
     }
   }
 
-  async function saveResult(w: Winner) {
-    if (!isAuthenticated || !user || !w) return
-    await supabase.from('game_results').insert({
-      user_id: user.id, player_name: playerName, game: 'connect-four',
+  function saveResult(w: Winner) {
+    if (!isAuthenticated || !userId || !w) return
+    saveGameResult({
+      userId, playerName, game: 'connect-four',
       result: w === 'draw' ? 'draw' : w === myPlayer ? 'win' : 'loss',
       opponent: mode === 'ai' ? 'AI' : (opponentInfo?.name ?? 'เพื่อน'),
-      score: 0, best_tile: 0, time_played: 0,
     })
   }
 

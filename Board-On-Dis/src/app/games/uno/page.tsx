@@ -13,8 +13,7 @@ import { usePlayerInfo } from '@/hooks/usePlayerInfo'
 import { useMultiplayerRoom } from '@/hooks/useMultiplayerRoom'
 import { createDeck, canPlay, getPlayableCards } from '@/lib/games/uno'
 import { sound } from '@/lib/sound'
-import { supabase } from '@/lib/supabase'
-import { useAuthStore } from '@/store/auth'
+import { saveGameResult } from '@/lib/saveGameResult'
 import { COLOR_OPTIONS } from '@/types/room'
 import type { Card, Color } from '@/lib/games/uno'
 
@@ -41,7 +40,6 @@ function cardDisplay(card: Card): string {
 
 function UnoPage() {
   const { playerName, avatarUrl, userId, isAuthenticated, roomId, mode, isHost } = usePlayerInfo()
-  const { user } = useAuthStore()
 
   // Shared game state (both AI and multiplayer)
   const [deck,      setDeck]      = useState<Card[]>([])
@@ -309,12 +307,11 @@ function UnoPage() {
     }
   }
 
-  async function saveResult(result: 'win' | 'loss') {
-    if (!isAuthenticated || !user) return
-    await supabase.from('game_results').insert({
-      user_id: user.id, player_name: playerName, game: 'uno',
-      result, opponent: mode === 'ai' ? 'AI' : (opponentInfo?.name ?? 'เพื่อน'),
-      score: 0, best_tile: 0, time_played: 0,
+  function saveResult(result: 'win' | 'loss') {
+    if (!isAuthenticated || !userId) return
+    saveGameResult({
+      userId, playerName, game: 'uno', result,
+      opponent: mode === 'ai' ? 'AI' : (opponentInfo?.name ?? 'เพื่อน'),
     })
   }
 

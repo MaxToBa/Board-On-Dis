@@ -14,14 +14,12 @@ import { usePlayerInfo } from '@/hooks/usePlayerInfo'
 import { useMultiplayerRoom } from '@/hooks/useMultiplayerRoom'
 import { initialBoard, getValidMoves, applyMove, checkWinner } from '@/lib/games/checkers'
 import { sound } from '@/lib/sound'
-import { supabase } from '@/lib/supabase'
-import { useAuthStore } from '@/store/auth'
+import { saveGameResult } from '@/lib/saveGameResult'
 import { COLOR_OPTIONS } from '@/types/room'
 import type { Board, Move } from '@/lib/games/checkers'
 
 function CheckersPage() {
   const { playerName, avatarUrl, userId, isAuthenticated, roomId, mode, isHost } = usePlayerInfo()
-  const { user } = useAuthStore()
   const [board, setBoard] = useState<Board>(initialBoard())
   const [currentTurn, setCurrentTurn] = useState<1 | 2>(1)
   const [selected, setSelected] = useState<[number, number] | null>(null)
@@ -134,13 +132,12 @@ function CheckersPage() {
     }
   }
 
-  async function saveResult(w: 1 | 2) {
-    if (!isAuthenticated || !user) return
-    await supabase.from('game_results').insert({
-      user_id: user.id, player_name: playerName, game: 'checkers',
+  function saveResult(w: 1 | 2) {
+    if (!isAuthenticated || !userId) return
+    saveGameResult({
+      userId, playerName, game: 'checkers',
       result: w === myPlayer ? 'win' : 'loss',
       opponent: mode === 'ai' ? 'AI' : (opponentInfo?.name ?? 'เพื่อน'),
-      score: 0, best_tile: 0, time_played: 0,
     })
   }
 

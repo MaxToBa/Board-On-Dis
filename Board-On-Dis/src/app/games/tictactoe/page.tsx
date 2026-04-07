@@ -14,8 +14,7 @@ import { usePlayerInfo } from '@/hooks/usePlayerInfo'
 import { useMultiplayerRoom } from '@/hooks/useMultiplayerRoom'
 import { checkWinner, getAvailableMoves, getWinLine } from '@/lib/games/tictactoe'
 import { sound } from '@/lib/sound'
-import { supabase } from '@/lib/supabase'
-import { useAuthStore } from '@/store/auth'
+import { saveGameResult } from '@/lib/saveGameResult'
 import { COLOR_OPTIONS } from '@/types/room'
 import type { Board, Winner } from '@/lib/games/tictactoe'
 
@@ -23,7 +22,6 @@ const CELL_SYMBOLS = { X: '✕', O: '◯' }
 
 function TictactoePage() {
   const { playerName, avatarUrl, userId, isAuthenticated, roomId, mode, isHost } = usePlayerInfo()
-  const { user } = useAuthStore()
 
   const [board, setBoard] = useState<Board>(Array(9).fill(null))
   const [currentTurn, setCurrentTurn] = useState<'X' | 'O'>('X')
@@ -155,19 +153,11 @@ function TictactoePage() {
     }
   }
 
-  async function saveResult(w: Winner) {
-    if (!isAuthenticated || !user || !w) return
+  function saveResult(w: Winner) {
+    if (!isAuthenticated || !userId || !w) return
     const result = w === 'draw' ? 'draw' : w === mySymbol ? 'win' : 'loss'
-    await supabase.from('game_results').insert({
-      user_id: user.id,
-      player_name: playerName,
-      game: 'tictactoe',
-      result,
-      opponent: mode === 'ai' ? 'AI' : (opponentInfo?.name ?? 'เพื่อน'),
-      score: 0,
-      best_tile: 0,
-      time_played: 0,
-    })
+    const opponent = mode === 'ai' ? 'AI' : (opponentInfo?.name ?? 'เพื่อน')
+    saveGameResult({ userId, playerName, game: 'tictactoe', result, opponent })
   }
 
   function resetAiGame() {
