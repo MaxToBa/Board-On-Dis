@@ -8,6 +8,7 @@ import ChatBox from '@/components/game/ChatBox'
 import WaitingRoom from '@/components/game/phases/WaitingRoom'
 import SetupRoom from '@/components/game/phases/SetupRoom'
 import GameResult from '@/components/game/phases/GameResult'
+import AiGameResult from '@/components/game/AiGameResult'
 import Confetti from '@/components/ui/Confetti'
 import { usePlayerInfo } from '@/hooks/usePlayerInfo'
 import { useMultiplayerRoom } from '@/hooks/useMultiplayerRoom'
@@ -143,7 +144,9 @@ function UnoPage() {
     while (topCard.type === 'wild4') { d.push(topCard); topCard = d.splice(0, 1)[0] }
     setDeck(d); setHand(myCards); setAiHand(aiCards)
     setDiscard([topCard]); setActiveColor(topCard.color === 'wild' ? 'red' : topCard.color)
-    setTimeout(() => setCoinWinner(Math.random() < 0.5 ? playerName : 'AI'), 300)
+    const aiFirst = Math.random() < 0.5
+    setMyTurn(!aiFirst) // if AI first, player doesn't go first
+    setTimeout(() => setCoinWinner(aiFirst ? 'AI' : playerName), 300)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── AI turn ──
@@ -175,8 +178,12 @@ function UnoPage() {
       if (card.type === 'draw2') { drawCards(2, true); nextMyTurn = false }
       if (card.type === 'wild4') { drawCards(4, true); nextMyTurn = false }
 
-      if (!nextMyTurn) setTimeout(() => setAiThinking(false), 400)
-      else { setMyTurn(true); setAiThinking(false) }
+      if (!nextMyTurn) {
+        // AI gets another turn (skip/draw2/wild4): re-trigger by toggling myTurn briefly
+        setTimeout(() => { setMyTurn(true); setTimeout(() => setMyTurn(false), 50); setAiThinking(false) }, 600)
+      } else {
+        setMyTurn(true); setAiThinking(false)
+      }
     }, 900)
   }, [myTurn, gameStarted]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -474,13 +481,13 @@ function UnoPage() {
         )}
       </AnimatePresence>
 
-      {/* AI result */}
       {winner && mode === 'ai' && (
-        <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-          onClick={() => { setWinner(null); setGameStarted(false); setHand([]); setAiHand([]); setDeck([]); setDiscard([]) }}
-          className="mt-4 bg-accent text-bg px-6 py-2 rounded-full font-bold text-sm hover:brightness-110">
-          เล่นอีกครั้ง
-        </motion.button>
+        <AiGameResult
+          result={winner === 'me' ? 'win' : 'loss'}
+          playerName={playerName}
+          aiName="AI"
+          onRestart={() => { setWinner(null); setGameStarted(false); setHand([]); setAiHand([]); setDeck([]); setDiscard([]) }}
+        />
       )}
 
       <CoinFlip winner={coinWinner} onDone={() => { setCoinWinner(null); setGameStarted(!isMultiplayer) }}/>

@@ -82,14 +82,16 @@ function TictactoePage() {
   // AI: solo coin flip
   useEffect(() => {
     if (mode !== 'ai' || gameStarted) return
-    const flip = Math.random() < 0.5
-    setMySymbol('X')
-    setTimeout(() => setCoinWinner(flip ? playerName : 'AI'), 300)
+    const aiFirst = Math.random() < 0.5
+    // If AI first → AI is X (goes first), player is O
+    // If player first → player is X, AI is O
+    setMySymbol(aiFirst ? 'O' : 'X')
+    setTimeout(() => setCoinWinner(aiFirst ? 'AI' : playerName), 300)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // AI move
+  // AI move — fires when it's NOT the player's turn
   useEffect(() => {
-    if (mode !== 'ai' || currentTurn !== 'O' || winner || !gameStarted) return
+    if (mode !== 'ai' || currentTurn === mySymbol || winner || !gameStarted) return
     setAiThinking(true)
     const available = getAvailableMoves(board)
     if (!available.length) return
@@ -109,7 +111,7 @@ function TictactoePage() {
         handleCellClick(move, true)
       })
       .finally(() => setAiThinking(false))
-  }, [currentTurn, gameStarted]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentTurn, gameStarted, mySymbol]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleCellClick(index: number, isAI = false) {
     if (board[index] || winner) return
@@ -179,6 +181,7 @@ function TictactoePage() {
   const isMyActiveTurn = isMultiplayer ? isMyRoomTurn : currentTurn === mySymbol
   const diffLabel: Record<string, string> = { easy: 'ง่าย', medium: 'กลาง', hard: 'ยาก' }
   const opponentName = isMultiplayer ? (opponentInfo?.name ?? 'รอผู้เล่น...') : `AI (${diffLabel[difficulty] ?? 'กลาง'})`
+  const aiSymbol = mySymbol === 'X' ? 'O' : 'X'
   const statusText = winner
     ? winner === 'draw' ? 'เสมอ!' : winner === mySymbol ? 'คุณชนะ! 🎉' : 'แพ้แล้ว...'
     : aiThinking ? 'AI กำลังคิด...'
@@ -250,9 +253,9 @@ function TictactoePage() {
         <PlayerCard
           name={isMultiplayer ? (hostInfo?.name ?? playerName) : playerName}
           avatar={isMultiplayer ? hostInfo?.avatarUrl : avatarUrl}
-          label={`ผู้เล่น (${isHost ? mySymbol : (mySymbol === 'X' ? 'O' : 'X')})`}
-          active={isMultiplayer ? roomTurn === 'host' && !winner : currentTurn === (isHost ? mySymbol : (mySymbol === 'X' ? 'O' : 'X')) && !winner}
-          score={isMultiplayer ? hostInfo?.score : scores[isHost ? mySymbol : (mySymbol === 'X' ? 'O' : 'X')]}
+          label={`ผู้เล่น (${isMultiplayer ? (isHost ? mySymbol : aiSymbol) : mySymbol})`}
+          active={isMultiplayer ? roomTurn === 'host' && !winner : currentTurn === mySymbol && !winner}
+          score={isMultiplayer ? hostInfo?.score : scores[mySymbol]}
         />
       }
       topRight={
@@ -260,9 +263,9 @@ function TictactoePage() {
           <PlayerCard
             name={isMultiplayer ? (guestInfo?.name ?? 'รอผู้เล่น...') : opponentName}
             avatar={isMultiplayer ? guestInfo?.avatarUrl : undefined}
-            label={`ฝ่ายตรงข้าม (${isHost ? (mySymbol === 'X' ? 'O' : 'X') : mySymbol})`}
+            label={`ฝ่ายตรงข้าม (${isMultiplayer ? (isHost ? aiSymbol : mySymbol) : aiSymbol})`}
             active={isMultiplayer ? roomTurn === 'guest' && !winner : currentTurn !== mySymbol && !winner}
-            score={isMultiplayer ? guestInfo?.score : scores[isHost ? (mySymbol === 'X' ? 'O' : 'X') : mySymbol]}
+            score={isMultiplayer ? guestInfo?.score : scores[aiSymbol]}
             flip
           />
           {isMultiplayer && roomId && <RoomCode code={roomId} />}

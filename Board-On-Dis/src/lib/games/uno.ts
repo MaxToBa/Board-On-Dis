@@ -45,8 +45,10 @@ function shuffle<T>(arr: T[]): T[] {
 export function canPlay(card: Card, topCard: Card, activeColor: Color): boolean {
   if (card.type === 'wild' || card.type === 'wild4') return true
   if (card.color === activeColor) return true
-  if (topCard.type === card.type) return true
-  if (card.value !== null && card.value === topCard.value) return true
+  // Same special type (skip/reverse/draw2 on same type of different color)
+  if (card.type !== 'number' && topCard.type === card.type) return true
+  // Same number value
+  if (card.type === 'number' && card.value !== null && card.value === topCard.value) return true
   return false
 }
 

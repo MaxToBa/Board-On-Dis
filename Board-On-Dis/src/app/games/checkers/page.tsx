@@ -65,9 +65,10 @@ function CheckersPage() {
 
   useEffect(() => {
     if (mode !== 'ai' || gameStarted) return
-    const flip = Math.random() < 0.5
-    setMyPlayer(1)
-    setTimeout(() => setCoinWinner(flip ? playerName : 'AI'), 300)
+    const aiFirst = Math.random() < 0.5
+    setMyPlayer(1) // player always 1, AI always 2
+    if (aiFirst) setCurrentTurn(2)
+    setTimeout(() => setCoinWinner(aiFirst ? 'AI' : playerName), 300)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
