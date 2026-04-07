@@ -87,8 +87,7 @@ export function useMultiplayerRoom({
         colorBg: '#7c6af5',
         score: state?.host?.score ?? 0,
       }
-      const needsInit = !state?.phase
-      if (needsInit) {
+      if (!state?.phase) {
         const newState: RoomState = {
           phase: 'waiting',
           host: hostInfo,
@@ -104,8 +103,8 @@ export function useMultiplayerRoom({
         // Already initialized — just sync local state
         // But update host info in case avatar/name changed
         const updated: RoomState = {
-          ...state,
-          host: { ...state.host, name: playerName, avatarUrl, userId },
+          ...(state as RoomState),
+          host: { ...(state as RoomState).host, name: playerName, avatarUrl, userId },
         }
         await pushState(updated)
         setRoomState(updated)
