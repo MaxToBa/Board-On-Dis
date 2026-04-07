@@ -1,11 +1,14 @@
 'use client'
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import GameLayout from '@/components/game/GameLayout'
 import { usePlayerInfo } from '@/hooks/usePlayerInfo'
 import { emptyBoard, addRandomTile, move as moveBoard, isGameOver, getBestTile } from '@/lib/games/game-2048'
 import { sound } from '@/lib/sound'
 import { saveGameResult } from '@/lib/saveGameResult'
+import { save2048Game, load2048Game, delete2048Save } from '@/lib/saveGame'
+import { get2048Leaderboard } from '@/lib/leaderboard'
+import type { LeaderboardRow } from '@/lib/leaderboard'
 import type { Board, Direction } from '@/lib/games/game-2048'
 
 const TILE_COLORS: Record<number, { bg: string; text: string; shadow?: string }> = {
@@ -30,7 +33,59 @@ function Game2048Page() {
   const [best, setBest] = useState(0)
   const [gameOver, setGameOver] = useState(false)
   const [won, setWon] = useState(false)
-  const [startTime] = useState(Date.now())
+  const startTimeRef = useRef(Date.now())
+  const elapsedRef = useRef(0)
+
+  // Save resume popup
+  const [resumeData, setResumeData] = useState<{ board: Board; score: number; best: number } | null>(null)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+
+  // Leaderboard
+  const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([])
+  useEffect(() => {
+    get2048Leaderboard(10).then(setLeaderboard)
+  }, [])
+
+  // Load save on mount
+  useEffect(() => {
+    if (!userId) return
+    load2048Game(userId).then((saved) => {
+      if (saved) setResumeData(saved)
+    })
+  }, [userId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto save every 30s
+  useEffect(() => {
+    if (!userId || gameOver) return
+    const interval = setInterval(() => {
+      const elapsed = elapsedRef.current + Math.floor((Date.now() - startTimeRef.current) / 1000)
+      save2048Game(userId, { board, score, best }, elapsed)
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [userId, board, score, best, gameOver]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function manualSave() {
+    if (!userId) return
+    setSaveStatus('saving')
+    const elapsed = elapsedRef.current + Math.floor((Date.now() - startTimeRef.current) / 1000)
+    await save2048Game(userId, { board, score, best }, elapsed)
+    setSaveStatus('saved')
+    setTimeout(() => setSaveStatus('idle'), 2000)
+  }
+
+  function resumeSave() {
+    if (!resumeData) return
+    setBoard(resumeData.board)
+    setScore(resumeData.score)
+    setBest(resumeData.best)
+    setResumeData(null)
+    startTimeRef.current = Date.now()
+  }
+
+  function discardSave() {
+    if (userId) delete2048Save(userId)
+    setResumeData(null)
+  }
 
   const handleKey = useCallback((dir: Direction) => {
     if (gameOver) return
@@ -52,7 +107,10 @@ function Game2048Page() {
     if (isGameOver(withTile)) {
       setGameOver(true)
       sound.lose()
-      saveResult(withTile, score + gained)
+      const finalScore = score + gained
+      const elapsed = elapsedRef.current + Math.floor((Date.now() - startTimeRef.current) / 1000)
+      saveResult(withTile, finalScore, elapsed)
+      if (userId) delete2048Save(userId)
     }
   }, [board, gameOver, score, won]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -84,22 +142,25 @@ function Game2048Page() {
     return () => { window.removeEventListener('touchstart', onStart); window.removeEventListener('touchend', onEnd) }
   }, [handleKey])
 
-  function saveResult(b: Board, finalScore: number) {
+  function saveResult(b: Board, finalScore: number, timePlayed: number) {
     if (!isAuthenticated || !userId) return
     saveGameResult({
       userId, playerName, game: '2048',
       result: getBestTile(b) >= 2048 ? 'win' : 'loss',
       opponent: 'Solo', isBot: false,
       score: finalScore, bestTile: getBestTile(b),
-      timePlayed: Math.floor((Date.now() - startTime) / 1000),
+      timePlayed,
     })
   }
 
   function restart() {
+    if (userId) delete2048Save(userId)
     setBoard(addRandomTile(addRandomTile(emptyBoard())))
     setScore(0)
     setGameOver(false)
     setWon(false)
+    startTimeRef.current = Date.now()
+    elapsedRef.current = 0
   }
 
   const getTileStyle = (v: number) => {
@@ -118,6 +179,42 @@ function Game2048Page() {
 
   return (
     <GameLayout title="2048" status={statusText} statusColor={statusColor}>
+
+      {/* Resume popup */}
+      <AnimatePresence>
+        {resumeData && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.85, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              className="bg-surface border border-white/15 rounded-2xl p-6 max-w-xs w-full text-center"
+            >
+              <div className="text-4xl mb-3">💾</div>
+              <h2 className="font-bold text-white text-lg mb-1">มีเกมที่บันทึกไว้</h2>
+              <p className="text-muted text-sm mb-5">
+                คะแนน <span className="text-accent font-bold">{resumeData.score.toLocaleString()}</span>
+                {' '}· ไทล์สูงสุด <span className="text-white font-bold">{Math.max(...resumeData.board.flat())}</span>
+              </p>
+              <div className="flex gap-3">
+                <button onClick={discardSave}
+                  className="flex-1 py-2.5 border border-white/10 rounded-xl text-sm font-bold text-muted hover:text-white hover:border-white/25 transition-all">
+                  เริ่มใหม่
+                </button>
+                <button onClick={resumeSave}
+                  className="flex-1 py-2.5 bg-accent text-bg rounded-xl text-sm font-bold hover:brightness-110 transition-all">
+                  เล่นต่อ
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Score boxes */}
       <div className="flex gap-3 mb-5">
         <div className="bg-[#bbada0] rounded-xl px-5 py-2.5 text-center min-w-[90px]">
@@ -128,11 +225,21 @@ function Game2048Page() {
           <p className="text-[10px] uppercase tracking-widest text-white/70 font-bold">ดีสุด</p>
           <p className="text-xl font-bold text-white">{best.toLocaleString()}</p>
         </div>
-        <button onClick={restart}
-          className="ml-auto bg-[#8f7a66] hover:bg-[#9f8a76] text-white rounded-xl px-4 py-2.5 text-xs font-bold transition-colors"
-        >
-          เริ่มใหม่
-        </button>
+        <div className="ml-auto flex gap-2">
+          {isAuthenticated && !gameOver && (
+            <button onClick={manualSave} disabled={saveStatus === 'saving'}
+              className="bg-surface2 border border-white/10 text-white rounded-xl px-3 py-2.5 text-xs font-bold hover:border-white/25 transition-all disabled:opacity-50"
+              title="บันทึกเกม"
+            >
+              {saveStatus === 'saved' ? '✓' : saveStatus === 'saving' ? '...' : '💾'}
+            </button>
+          )}
+          <button onClick={restart}
+            className="bg-[#8f7a66] hover:bg-[#9f8a76] text-white rounded-xl px-4 py-2.5 text-xs font-bold transition-colors"
+          >
+            เริ่มใหม่
+          </button>
+        </div>
       </div>
 
       {/* Board */}
@@ -186,6 +293,39 @@ function Game2048Page() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Leaderboard */}
+      {leaderboard.length > 0 && (
+        <div className="mt-6 w-full max-w-xs">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-muted mb-3">🏆 อันดับ 2048</h3>
+          <div className="flex flex-col gap-1.5">
+            {leaderboard.map((row, i) => {
+              const isMe = row.userId === userId
+              const TROPHY = ['🥇', '🥈', '🥉']
+              return (
+                <a
+                  key={row.userId}
+                  href={`/profile/${row.userId}`}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all hover:border-white/25 ${
+                    isMe
+                      ? 'border-accent/40 bg-accent/5 ring-1 ring-accent/20'
+                      : 'border-white/8 bg-surface hover:bg-surface2'
+                  }`}
+                >
+                  <span className="text-sm w-6 text-center flex-shrink-0">
+                    {TROPHY[i] ?? <span className="text-xs text-muted">{i + 1}</span>}
+                  </span>
+                  <span className={`flex-1 text-xs font-bold truncate ${isMe ? 'text-accent' : 'text-white'}`}>
+                    {row.playerName} {isMe && '(คุณ)'}
+                  </span>
+                  <span className="text-xs font-bold text-accent">{row.bestScore.toLocaleString()}</span>
+                  <span className="text-[10px] text-muted">{row.bestTile}</span>
+                </a>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </GameLayout>
   )
 }
