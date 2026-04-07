@@ -9,6 +9,7 @@ import ChatBox from '@/components/game/ChatBox'
 import WaitingRoom from '@/components/game/phases/WaitingRoom'
 import SetupRoom from '@/components/game/phases/SetupRoom'
 import GameResult from '@/components/game/phases/GameResult'
+import AiGameResult from '@/components/game/AiGameResult'
 import Confetti from '@/components/ui/Confetti'
 import { usePlayerInfo } from '@/hooks/usePlayerInfo'
 import { useMultiplayerRoom } from '@/hooks/useMultiplayerRoom'
@@ -263,12 +264,12 @@ function CheckersPage() {
       </div>
 
       {winner && mode === 'ai' && (
-        <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-          onClick={() => { setBoard(initialBoard()); setWinner(null); setCurrentTurn(1); setSelected(null); setValidMoves([]); setGameStarted(false); setTimeout(() => setCoinWinner(Math.random() < 0.5 ? playerName : 'AI'), 300) }}
-          className="mt-4 bg-accent text-bg px-6 py-2 rounded-full font-bold text-sm hover:brightness-110"
-        >
-          เล่นอีกครั้ง
-        </motion.button>
+        <AiGameResult
+          result={winner === myPlayer ? 'win' : 'loss'}
+          playerName={playerName}
+          aiName={opponentName}
+          onRestart={() => { setBoard(initialBoard()); setWinner(null); setCurrentTurn(1); setSelected(null); setValidMoves([]); setGameStarted(false); setTimeout(() => setCoinWinner(Math.random() < 0.5 ? playerName : 'AI'), 300) }}
+        />
       )}
 
       <CoinFlip winner={coinWinner} onDone={() => { setCoinWinner(null); setGameStarted(true) }} />

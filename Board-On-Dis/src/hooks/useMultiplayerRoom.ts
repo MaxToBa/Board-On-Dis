@@ -49,14 +49,26 @@ export function useMultiplayerRoom({
   const channelRef = useRef<RealtimeChannel | null>(null)
   const roomIdRef = useRef(roomId)
   roomIdRef.current = roomId
+  const initializedRef = useRef(false)
 
   // Use ref for the callback to avoid stale closures
   const callbackRef = useRef(onGameStateChange)
   useEffect(() => { callbackRef.current = onGameStateChange }, [onGameStateChange])
 
+  const roomStateRef = useRef<RoomState | null>(null)
+
+  // Keep ref in sync with state for use inside callbacks
+  const applyState = useCallback((state: RoomState) => {
+    roomStateRef.current = state
+    setRoomState(state)
+    callbackRef.current(state as unknown as Record<string, unknown>)
+  }, [])
+
   // Push state to DB
   const pushState = useCallback(async (state: RoomState) => {
     if (!roomIdRef.current) return
+    roomStateRef.current = state
+    setRoomState(state)
     const { error } = await supabase
       .from('rooms')
       .update({
@@ -68,15 +80,28 @@ export function useMultiplayerRoom({
     if (error) console.error('[useMultiplayerRoom] pushState error:', error)
   }, [])
 
+  // Fetch latest state from DB (used by polling and init)
+  const fetchAndApply = useCallback(async () => {
+    if (!roomIdRef.current) return
+    const { data } = await supabase.from('rooms').select('state').eq('id', roomIdRef.current).single()
+    if (!data?.state) return
+    const state = data.state as RoomState
+    // Only apply if different from current local state
+    if (JSON.stringify(roomStateRef.current) !== JSON.stringify(state)) {
+      applyState(state)
+    }
+  }, [applyState])
+
   // Load initial room state from DB
   const loadRoom = useCallback(async () => {
-    if (!roomId) return
+    if (!roomId || initializedRef.current) return
+    initializedRef.current = true
+
     const { data } = await supabase.from('rooms').select('*').eq('id', roomId).single()
     if (!data) return
 
     const state = data.state as RoomState | null
 
-    // If host: initialize with new format if not yet done
     if (isHost) {
       const hostInfo: PlayerInRoom = {
         userId,
@@ -88,6 +113,7 @@ export function useMultiplayerRoom({
         score: state?.host?.score ?? 0,
       }
       if (!state?.phase) {
+        // First time init
         const newState: RoomState = {
           phase: 'waiting',
           host: hostInfo,
@@ -98,30 +124,26 @@ export function useMultiplayerRoom({
           rematchVotes: [],
         }
         await pushState(newState)
-        setRoomState(newState)
       } else {
-        // Already initialized — just sync local state
-        // But update host info in case avatar/name changed
+        // Already initialized — sync host info but preserve existing state
         const updated: RoomState = {
           ...(state as RoomState),
           host: { ...(state as RoomState).host, name: playerName, avatarUrl, userId },
         }
         await pushState(updated)
-        setRoomState(updated)
         callbackRef.current(updated as unknown as Record<string, unknown>)
       }
     } else {
       // Guest: read existing state
       if (state) {
-        setRoomState(state)
-        callbackRef.current(state as unknown as Record<string, unknown>)
-        // If we haven't joined yet (guest is null), join now
-        if (!state.guest || state.guest.name !== playerName) {
+        applyState(state)
+        // If we haven't joined yet (guest is null or different name), join now
+        if (!state.guest || state.guest.userId !== userId) {
           await joinAsGuest(state)
         }
       }
     }
-  }, [roomId, isHost, playerName, avatarUrl, userId, pushState]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [roomId, isHost, playerName, avatarUrl, userId, pushState, applyState]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function joinAsGuest(currentState: RoomState) {
     if (!roomIdRef.current) return
@@ -145,7 +167,7 @@ export function useMultiplayerRoom({
       players: [currentState.host.name, playerName],
       updated_at: new Date().toISOString(),
     }).eq('id', roomIdRef.current)
-    setRoomState(newState)
+    applyState(newState)
   }
 
   // Subscribe to realtime changes
@@ -158,15 +180,14 @@ export function useMultiplayerRoom({
     }
 
     const channel = supabase
-      .channel(`room-mp-${roomId}-${Date.now()}`)
+      .channel(`room-mp-${roomId}`)
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` },
         (payload: { new: Record<string, unknown> }) => {
           const state = payload.new?.state as RoomState | null
           if (state) {
-            setRoomState(state)
-            callbackRef.current(state as unknown as Record<string, unknown>)
+            applyState(state)
           }
         }
       )
@@ -182,27 +203,33 @@ export function useMultiplayerRoom({
       channelRef.current = null
       setConnected(false)
     }
-  }, [roomId, loadRoom])
+  }, [roomId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Polling fallback every 2s — ensures sync even when realtime misses an event
+  useEffect(() => {
+    if (!roomId) return
+    const interval = setInterval(fetchAndApply, 2000)
+    return () => clearInterval(interval)
+  }, [roomId, fetchAndApply])
 
   // When phase becomes coin_flip and I'm host → start 3s timer to move to playing
   useEffect(() => {
     if (roomState?.phase !== 'coin_flip' || !isHost) return
     const timer = setTimeout(async () => {
-      if (!roomIdRef.current || !roomState) return
+      if (!roomIdRef.current || !roomStateRef.current) return
       const { data } = await supabase.from('rooms').select('state').eq('id', roomIdRef.current).single()
-      const latest = (data?.state as RoomState) ?? roomState
-      if (latest.phase !== 'coin_flip') return // already changed
+      const latest = (data?.state as RoomState) ?? roomStateRef.current
+      if (latest.phase !== 'coin_flip') return
       const playState: RoomState = { ...latest, phase: 'playing' }
       await pushState(playState)
     }, 3000)
     return () => clearTimeout(timer)
-  }, [roomState?.phase, isHost, pushState]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [roomState?.phase, isHost, pushState])
 
   const markReady = useCallback(async (color: string) => {
     if (!roomIdRef.current) return
-    // Read latest from DB to avoid race condition
     const { data } = await supabase.from('rooms').select('state').eq('id', roomIdRef.current).single()
-    const current = (data?.state as RoomState) ?? roomState
+    const current = (data?.state as RoomState) ?? roomStateRef.current
     if (!current) return
 
     const currentPlayer = isHost ? current.host : (current.guest ?? current.host)
@@ -221,7 +248,6 @@ export function useMultiplayerRoom({
       : updated.host.ready
 
     if (otherReady && updated.guest) {
-      // Both ready → trigger coin flip
       const firstTurn: 'host' | 'guest' = Math.random() < 0.5 ? 'host' : 'guest'
       updated.phase = 'coin_flip'
       updated.firstTurn = firstTurn
@@ -229,59 +255,59 @@ export function useMultiplayerRoom({
     }
 
     await pushState(updated)
-    setRoomState(updated)
-  }, [roomId, roomState, isHost, pushState]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isHost, pushState]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateGameData = useCallback(async (data: Record<string, unknown>) => {
-    if (!roomIdRef.current || !roomState) return
-    const newState = { ...roomState, ...data } as RoomState
+    if (!roomIdRef.current || !roomStateRef.current) return
+    const newState = { ...roomStateRef.current, ...data } as RoomState
     await pushState(newState)
-  }, [roomState, pushState])
+  }, [pushState])
 
   const finishGame = useCallback(async (winner: 'host' | 'guest' | 'draw') => {
-    if (!roomIdRef.current || !roomState) return
+    if (!roomIdRef.current || !roomStateRef.current) return
+    const current = roomStateRef.current
     const newState: RoomState = {
-      ...roomState,
+      ...current,
       phase: 'finished',
       winner,
       host: {
-        ...roomState.host,
-        score: roomState.host.score + (winner === 'host' ? 1 : 0),
+        ...current.host,
+        score: current.host.score + (winner === 'host' ? 1 : 0),
       },
-      guest: roomState.guest ? {
-        ...roomState.guest,
-        score: roomState.guest.score + (winner === 'guest' ? 1 : 0),
+      guest: current.guest ? {
+        ...current.guest,
+        score: current.guest.score + (winner === 'guest' ? 1 : 0),
       } : null,
     }
     await pushState(newState)
-  }, [roomState, pushState])
+  }, [pushState])
 
   const requestRematch = useCallback(async (resetData: Record<string, unknown>) => {
-    if (!roomIdRef.current || !roomState) return
+    if (!roomIdRef.current || !roomStateRef.current) return
+    const current = roomStateRef.current
 
-    const votes = [...new Set([...roomState.rematchVotes, playerName])]
-    const guestName = roomState.guest?.name ?? ''
-    const bothVoted = votes.includes(roomState.host.name) && !!guestName && votes.includes(guestName)
+    const votes = [...new Set([...current.rematchVotes, playerName])]
+    const guestName = current.guest?.name ?? ''
+    const bothVoted = votes.includes(current.host.name) && !!guestName && votes.includes(guestName)
 
-    if (bothVoted && roomState.guest) {
-      // Reset for new game
+    if (bothVoted && current.guest) {
       const firstTurn: 'host' | 'guest' = Math.random() < 0.5 ? 'host' : 'guest'
       const resetState = {
-        ...roomState,
+        ...current,
         ...resetData,
         phase: 'coin_flip' as const,
         winner: null,
         firstTurn,
         currentTurn: firstTurn,
         rematchVotes: [],
-        host: { ...roomState.host, ready: true },
-        guest: { ...roomState.guest, ready: true },
+        host: { ...current.host, ready: true },
+        guest: { ...current.guest, ready: true },
       } as RoomState
       await pushState(resetState)
     } else {
-      await pushState({ ...roomState, rematchVotes: votes })
+      await pushState({ ...current, rematchVotes: votes })
     }
-  }, [roomState, playerName, pushState])
+  }, [playerName, pushState])
 
   // Derived values
   const phase = roomState?.phase ?? 'waiting'
@@ -295,7 +321,6 @@ export function useMultiplayerRoom({
   const rematchVotes = roomState?.rematchVotes ?? []
   const isMyTurn = currentTurn === (isHost ? 'host' : 'guest')
 
-  // myPlayerNum: 1 = goes first (firstTurn matches my role), 2 = goes second
   const myRole = isHost ? 'host' : 'guest'
   const myPlayerNum: 1 | 2 = firstTurn === null
     ? (isHost ? 1 : 2)

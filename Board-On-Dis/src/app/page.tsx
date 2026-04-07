@@ -1,7 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import GameCard from '@/components/lobby/GameCard'
 import GameModal from '@/components/lobby/GameModal'
@@ -107,24 +106,7 @@ const FILTERS: { id: Filter; label: string }[] = [
 export default function LobbyPage() {
   const [filter, setFilter] = useState<Filter>('all')
   const [selectedGame, setSelectedGame] = useState<GameInfo | null>(null)
-  const [onlineCount, setOnlineCount] = useState<number | null>(null)
   const [liveCounts, setLiveCounts] = useState<Partial<Record<GameType, number>>>({})
-
-  useEffect(() => {
-    const channel = supabase.channel('lobby-presence', {
-      config: { presence: { key: crypto.randomUUID() } },
-    })
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        setOnlineCount(Object.keys(channel.presenceState()).length)
-      })
-      .subscribe(async (status: string) => {
-        if (status === 'SUBSCRIBED') {
-          await channel.track({ online_at: new Date().toISOString() })
-        }
-      })
-    return () => { supabase.removeChannel(channel) }
-  }, [])
 
   useEffect(() => {
     async function fetchCounts() {
@@ -164,12 +146,6 @@ export default function LobbyPage() {
               <p className="text-xs font-bold tracking-[3px] uppercase text-accent">
                 ✦ Multi-player Board Games
               </p>
-              {onlineCount !== null && (
-                <div className="flex items-center gap-1.5 bg-green/10 border border-green/20 text-green text-xs font-bold px-3 py-1 rounded-full">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green animate-pulse" />
-                  {onlineCount} ออนไลน์
-                </div>
-              )}
             </div>
             <div className="flex items-center gap-6 mb-4 flex-wrap">
               <img src="/logo.png" alt="Board On Dis" width={220} className="drop-shadow-2xl flex-shrink-0" />
@@ -185,13 +161,6 @@ export default function LobbyPage() {
               <p className="text-muted max-w-md leading-relaxed text-base">
                 เลือกเกมที่ชอบ สร้างห้อง แล้วส่ง code ให้เพื่อน หรือเล่นคนเดียวกับ AI ก็ได้
               </p>
-              <Link
-                href="/leaderboard"
-                className="flex items-center gap-2 bg-surface border border-white/10 hover:border-accent/40 hover:bg-accent/5 text-white hover:text-accent rounded-xl px-4 py-2.5 text-sm font-bold transition-all"
-                onClick={() => sound.click()}
-              >
-                🏆 ดูอันดับ
-              </Link>
             </div>
           </motion.section>
 

@@ -21,7 +21,39 @@
       "Bash(/e/nodejs/node-v22.14.0-win-x64/node.exe -e ':*)",
       "Bash(/e/nodejs/node-v22.14.0-win-x64/node.exe -e \"const d=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\); const p=JSON.parse\\(d\\); console.log\\(JSON.stringify\\({...p.dependencies,...p.devDependencies}, null, 2\\)\\)\")",
       "Bash(/e/nodejs/node-v22.14.0-win-x64/npm.cmd install:*)",
-      "Bash(gh api:*)"
+      "Bash(gh api:*)",
+      "Bash(/e/nodejs/node-v22.14.0-win-x64/npm.cmd run:*)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx|sql|json\\)$\")",
+      "Bash(npx tsc:*)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Read(//usr/local/bin/**)",
+      "Read(//usr/bin/**)",
+      "Read(//c/Users/maxza/.nvm/versions/**)",
+      "Read(//c/Program Files/**)",
+      "Read(//c/Program Files \\(x86\\)/**)",
+      "Read(//c/Users/maxza/AppData/Roaming/**)",
+      "Bash(cmd.exe /c \"where node 2>nul\")",
+      "Bash(cmd.exe /c \"where node\")",
+      "Read(//c/Users/maxza/AppData/Local/Programs/**)",
+      "Read(//c/Users/maxza//**)",
+      "Read(//c//**)",
+      "Bash(grep -n \"connected\\\\b\" src/hooks/useMultiplayerRoom.ts src/app/games/*.tsx src/app/games/*/page.tsx)",
+      "Read(//c/Users/maxza/**)",
+      "Read(//c/ProgramData/**)",
+      "Bash(\"/c/Program Files/Adobe/Adobe Photoshop 2025/node.exe\" --version)",
+      "Bash(curl -L \"https://nodejs.org/dist/v20.19.0/node-v20.19.0-x64.msi\" -o \"C:/Users/maxza/Downloads/node-v20.19.0-x64.msi\" --progress-bar)",
+      "Bash(msiexec /i \"C:/Users/maxza/Downloads/node-v20.19.0-x64.msi\" /quiet /norestart)",
+      "Bash(sed -n '158,172p' src/app/games/tictactoe/page.tsx)",
+      "Bash(sed -n '129,143p' src/app/games/gomoku/page.tsx)",
+      "Bash(sed -n '137,150p' src/app/games/checkers/page.tsx)",
+      "Bash(sed -n '124,137p' src/app/games/connect-four/page.tsx)",
+      "Bash(sed -n '22,27p' src/app/games/gomoku/page.tsx)",
+      "Bash(sed -n '22,27p' src/app/games/checkers/page.tsx)",
+      "Bash(sed -n '22,27p' src/app/games/connect-four/page.tsx)",
+      "Bash(sed -n '1,22p' src/app/games/battleship/page.tsx)"
+    ],
+    "additionalDirectories": [
+      "e:\\Board On Dis\\Board-On-Dis\\src\\app\\profile"
     ]
   }
 }

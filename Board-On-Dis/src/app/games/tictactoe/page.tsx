@@ -9,6 +9,7 @@ import ChatBox from '@/components/game/ChatBox'
 import WaitingRoom from '@/components/game/phases/WaitingRoom'
 import SetupRoom from '@/components/game/phases/SetupRoom'
 import GameResult from '@/components/game/phases/GameResult'
+import AiGameResult from '@/components/game/AiGameResult'
 import Confetti from '@/components/ui/Confetti'
 import { usePlayerInfo } from '@/hooks/usePlayerInfo'
 import { useMultiplayerRoom } from '@/hooks/useMultiplayerRoom'
@@ -318,16 +319,13 @@ function TictactoePage() {
         })}
       </div>
 
-      {/* AI result actions */}
       {winner && mode === 'ai' && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mt-6 flex gap-3">
-          <button
-            onClick={resetAiGame}
-            className="bg-accent text-bg px-6 py-2 rounded-full font-bold text-sm hover:brightness-110 transition-all"
-          >
-            เล่นอีกครั้ง
-          </button>
-        </motion.div>
+        <AiGameResult
+          result={winner === 'draw' ? 'draw' : winner === mySymbol ? 'win' : 'loss'}
+          playerName={playerName}
+          aiName={opponentName}
+          onRestart={resetAiGame}
+        />
       )}
 
       <CoinFlip winner={coinWinner} onDone={() => { setCoinWinner(null); setGameStarted(true) }} />

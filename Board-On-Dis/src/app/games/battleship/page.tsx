@@ -9,6 +9,7 @@ import ChatBox from '@/components/game/ChatBox'
 import WaitingRoom from '@/components/game/phases/WaitingRoom'
 import SetupRoom from '@/components/game/phases/SetupRoom'
 import GameResult from '@/components/game/phases/GameResult'
+import AiGameResult from '@/components/game/AiGameResult'
 import Confetti from '@/components/ui/Confetti'
 import { usePlayerInfo } from '@/hooks/usePlayerInfo'
 import { useMultiplayerRoom } from '@/hooks/useMultiplayerRoom'
@@ -583,13 +584,12 @@ function BattleshipPage() {
       </div>
 
       {winner&&mode==='ai'&&(
-        <motion.div initial={{opacity:0,scale:0.8}} animate={{opacity:1,scale:1}} className="mt-6 flex flex-col items-center gap-3">
-          <p className="text-2xl font-display">{winner==='me'?'🏆 ชนะแล้ว!':'💀 แพ้แล้ว...'}</p>
-          <button onClick={()=>window.location.reload()}
-            className="bg-accent text-bg px-8 py-2.5 rounded-full font-bold text-sm hover:brightness-110">
-            เล่นอีกครั้ง
-          </button>
-        </motion.div>
+        <AiGameResult
+          result={winner==='me'?'win':'loss'}
+          playerName={playerName}
+          aiName={`AI (${({easy:'ง่าย',medium:'กลาง',hard:'ยาก'} as Record<string,string>)[difficulty]??'กลาง'})`}
+          onRestart={()=>window.location.reload()}
+        />
       )}
 
       <CoinFlip winner={coinWinner} onDone={()=>setCoinWinner(null)}/>
