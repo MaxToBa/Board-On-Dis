@@ -259,7 +259,11 @@ function ConnectFourPage() {
           result={winner === 'draw' ? 'draw' : winner === myPlayer ? 'win' : 'loss'}
           playerName={playerName}
           aiName={opponentName}
-          onRestart={() => { setBoard(emptyBoard()); setWinner(null); setCurrentTurn(1); setGameStarted(false); setTimeout(() => setCoinWinner(Math.random() < 0.5 ? playerName : 'AI'), 300) }}
+          onRestart={() => {
+            const aiFirst = Math.random() < 0.5
+            setBoard(emptyBoard()); setWinner(null); setCurrentTurn(aiFirst ? 2 : 1); setGameStarted(false)
+            setTimeout(() => setCoinWinner(aiFirst ? 'AI' : playerName), 300)
+          }}
         />
       )}
 

@@ -269,7 +269,11 @@ function CheckersPage() {
           result={winner === myPlayer ? 'win' : 'loss'}
           playerName={playerName}
           aiName={opponentName}
-          onRestart={() => { setBoard(initialBoard()); setWinner(null); setCurrentTurn(1); setSelected(null); setValidMoves([]); setGameStarted(false); setTimeout(() => setCoinWinner(Math.random() < 0.5 ? playerName : 'AI'), 300) }}
+          onRestart={() => {
+            const aiFirst = Math.random() < 0.5
+            setBoard(initialBoard()); setWinner(null); setCurrentTurn(aiFirst ? 2 : 1); setSelected(null); setValidMoves([]); setGameStarted(false)
+            setTimeout(() => setCoinWinner(aiFirst ? 'AI' : playerName), 300)
+          }}
         />
       )}
 

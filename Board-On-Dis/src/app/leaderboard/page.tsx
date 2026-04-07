@@ -3,7 +3,7 @@ import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import { supabase } from '@/lib/supabase'
-import { getGameLeaderboard } from '@/lib/leaderboard'
+import { getGameLeaderboard, get2048Leaderboard } from '@/lib/leaderboard'
 import { useAuthStore } from '@/store/auth'
 import type { GameResultRecord, GameType } from '@/types'
 import type { LeaderboardRow } from '@/lib/leaderboard'
@@ -40,7 +40,7 @@ function LeaderboardPage() {
   async function loadData() {
     setLoading(true)
     if (tab === 'ranking') {
-      const rows = await getGameLeaderboard(game, 100)
+      const rows = game === '2048' ? await get2048Leaderboard(100) : await getGameLeaderboard(game, 100)
       setRankings(rows)
     } else {
       if (!user) { setLoading(false); return }
@@ -152,15 +152,25 @@ function LeaderboardPage() {
               <div className="text-center py-16 text-muted">ยังไม่มีข้อมูล</div>
             ) : (
               <>
-                <div className="flex items-center gap-2 px-4 py-1 text-[10px] uppercase tracking-widest text-muted">
-                  <span className="w-8" />
-                  <span className="flex-1">ผู้เล่น</span>
-                  <span className="w-10 text-center text-green">ชนะ</span>
-                  <span className="w-10 text-center text-red">แพ้</span>
-                  <span className="w-10 text-center">เสมอ</span>
-                  <span className="w-20 text-center text-accent">อัตรา%</span>
-                  <span className="w-14 text-center">รวม</span>
-                </div>
+                {game === '2048' ? (
+                  <div className="flex items-center gap-2 px-4 py-1 text-[10px] uppercase tracking-widest text-muted">
+                    <span className="w-8" />
+                    <span className="flex-1">ผู้เล่น</span>
+                    <span className="w-28 text-center text-accent">คะแนนสูงสุด</span>
+                    <span className="w-20 text-center text-yellow-400">ไทล์สูงสุด</span>
+                    <span className="w-14 text-center">รวม</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 px-4 py-1 text-[10px] uppercase tracking-widest text-muted">
+                    <span className="w-8" />
+                    <span className="flex-1">ผู้เล่น</span>
+                    <span className="w-10 text-center text-green">ชนะ</span>
+                    <span className="w-10 text-center text-red">แพ้</span>
+                    <span className="w-10 text-center">เสมอ</span>
+                    <span className="w-20 text-center text-accent">อัตรา%</span>
+                    <span className="w-14 text-center">รวม</span>
+                  </div>
+                )}
                 {filteredRankings.map((row, i) => {
                   const isMe = row.userId === user?.id
                   return (
@@ -179,18 +189,28 @@ function LeaderboardPage() {
                       <p className={`flex-1 text-sm font-semibold truncate ${isMe ? 'text-accent' : 'text-white'}`}>
                         {row.playerName}{isMe ? ' (คุณ)' : ''}
                       </p>
-                      <span className="w-10 text-center text-sm font-bold text-green">{row.wins}</span>
-                      <span className="w-10 text-center text-sm text-red/80">{row.losses}</span>
-                      <span className="w-10 text-center text-sm text-muted">{row.draws}</span>
-                      <div className="w-20 flex flex-col items-center gap-0.5">
-                        <span className={`text-xs font-bold ${row.winRate >= 60 ? 'text-accent' : 'text-white/60'}`}>
-                          {row.winRate}%
-                        </span>
-                        <div className="w-full h-1 rounded-full bg-white/10 overflow-hidden">
-                          <div className="h-full rounded-full bg-accent" style={{ width: `${row.winRate}%` }} />
-                        </div>
-                      </div>
-                      <span className="w-14 text-center text-xs text-muted">{row.total}</span>
+                      {game === '2048' ? (
+                        <>
+                          <span className="w-28 text-center text-sm font-bold text-accent">{row.bestScore.toLocaleString()}</span>
+                          <span className="w-20 text-center text-sm font-bold text-yellow-400">{row.bestTile > 0 ? row.bestTile : '-'}</span>
+                          <span className="w-14 text-center text-xs text-muted">{row.total}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="w-10 text-center text-sm font-bold text-green">{row.wins}</span>
+                          <span className="w-10 text-center text-sm text-red/80">{row.losses}</span>
+                          <span className="w-10 text-center text-sm text-muted">{row.draws}</span>
+                          <div className="w-20 flex flex-col items-center gap-0.5">
+                            <span className={`text-xs font-bold ${row.winRate >= 60 ? 'text-accent' : 'text-white/60'}`}>
+                              {row.winRate}%
+                            </span>
+                            <div className="w-full h-1 rounded-full bg-white/10 overflow-hidden">
+                              <div className="h-full rounded-full bg-accent" style={{ width: `${row.winRate}%` }} />
+                            </div>
+                          </div>
+                          <span className="w-14 text-center text-xs text-muted">{row.total}</span>
+                        </>
+                      )}
                     </Link>
                   )
                 })}

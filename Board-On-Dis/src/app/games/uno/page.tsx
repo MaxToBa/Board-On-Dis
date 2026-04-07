@@ -486,7 +486,20 @@ function UnoPage() {
           result={winner === 'me' ? 'win' : 'loss'}
           playerName={playerName}
           aiName="AI"
-          onRestart={() => { setWinner(null); setGameStarted(false); setHand([]); setAiHand([]); setDeck([]); setDiscard([]) }}
+          onRestart={() => {
+        const d = createDeck()
+        const myCards = d.splice(0, 7)
+        const aiCards = d.splice(0, 7)
+        let topCard = d.splice(0, 1)[0]
+        while (topCard.type === 'wild4') { d.push(topCard); topCard = d.splice(0, 1)[0] }
+        setDeck(d); setHand(myCards); setAiHand(aiCards)
+        setDiscard([topCard]); setActiveColor(topCard.color === 'wild' ? 'red' : topCard.color)
+        setWinner(null); setPickingColor(false); setPendingCard(null); setUnoAlert(null)
+        const aiFirst = Math.random() < 0.5
+        setMyTurn(!aiFirst)
+        setGameStarted(false)
+        setTimeout(() => setCoinWinner(aiFirst ? 'AI' : playerName), 300)
+      }}
         />
       )}
 

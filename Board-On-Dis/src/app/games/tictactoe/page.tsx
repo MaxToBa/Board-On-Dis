@@ -169,8 +169,9 @@ function TictactoePage() {
     setWinLine(null)
     setCurrentTurn('X')
     setGameStarted(false)
-    const flip = Math.random() < 0.5
-    setTimeout(() => setCoinWinner(flip ? playerName : 'AI'), 300)
+    const aiFirst = Math.random() < 0.5
+    setMySymbol(aiFirst ? 'O' : 'X')
+    setTimeout(() => setCoinWinner(aiFirst ? 'AI' : playerName), 300)
   }
 
   function handleRematch() {
