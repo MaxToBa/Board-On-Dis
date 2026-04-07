@@ -3,8 +3,10 @@ import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import { supabase } from '@/lib/supabase'
+import { getGameLeaderboard } from '@/lib/leaderboard'
 import { useAuthStore } from '@/store/auth'
 import type { GameResultRecord, GameType } from '@/types'
+import type { LeaderboardRow } from '@/lib/leaderboard'
 
 const GAMES: { id: GameType | 'all'; label: string; emoji: string }[] = [
   { id: 'all', label: 'ทุกเกม', emoji: '🎮' },
@@ -24,21 +26,11 @@ const GAME_LABELS: Record<string, string> = {
 
 type Tab = 'ranking' | 'history'
 
-interface RankRow {
-  player_name: string
-  wins: number
-  losses: number
-  draws: number
-  total: number
-  winRate: number
-  bestScore: number
-}
-
 function LeaderboardPage() {
   const { user } = useAuthStore()
   const [tab, setTab] = useState<Tab>('ranking')
   const [game, setGame] = useState<GameType | 'all'>('all')
-  const [rankings, setRankings] = useState<RankRow[]>([])
+  const [rankings, setRankings] = useState<LeaderboardRow[]>([])
   const [history, setHistory] = useState<GameResultRecord[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -48,28 +40,16 @@ function LeaderboardPage() {
   async function loadData() {
     setLoading(true)
     if (tab === 'ranking') {
-      let q = supabase.from('game_results').select('player_name, result, score')
-      if (game !== 'all') q = q.eq('game', game)
-      const { data } = await q
-      if (data) {
-        const map: Record<string, RankRow> = {}
-        for (const r of data) {
-          if (!map[r.player_name]) map[r.player_name] = { player_name: r.player_name, wins: 0, losses: 0, draws: 0, total: 0, winRate: 0, bestScore: 0 }
-          map[r.player_name].total++
-          if (r.result === 'win') map[r.player_name].wins++
-          else if (r.result === 'loss') map[r.player_name].losses++
-          else map[r.player_name].draws++
-          if ((r.score ?? 0) > map[r.player_name].bestScore) map[r.player_name].bestScore = r.score ?? 0
-        }
-        const rows = Object.values(map).map(r => ({
-          ...r,
-          winRate: r.total > 0 ? Math.round((r.wins / r.total) * 100) : 0,
-        })).sort((a, b) => b.wins - a.wins || b.winRate - a.winRate)
-        setRankings(rows)
-      }
+      const rows = await getGameLeaderboard(game, 100)
+      setRankings(rows)
     } else {
       if (!user) { setLoading(false); return }
-      let q = supabase.from('game_results').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(100)
+      let q = supabase
+        .from('game_results')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(100)
       if (game !== 'all') q = q.eq('game', game)
       const { data } = await q
       if (data) setHistory(data as GameResultRecord[])
@@ -85,23 +65,20 @@ function LeaderboardPage() {
   }
 
   const filteredRankings = rankings.filter(r =>
-    !search || r.player_name.toLowerCase().includes(search.toLowerCase())
+    !search || r.playerName.toLowerCase().includes(search.toLowerCase())
   )
 
-  // My stats summary for history tab
   const myStats = tab === 'history' && history.length > 0 ? {
     wins: history.filter(h => h.result === 'win').length,
     losses: history.filter(h => h.result === 'loss').length,
     draws: history.filter(h => h.result === 'draw').length,
     winRate: Math.round((history.filter(h => h.result === 'win').length / history.length) * 100),
-    bestScore: Math.max(...history.map(h => h.score ?? 0)),
   } : null
 
   return (
     <div className="min-h-screen bg-bg">
       <Header />
       <div className="max-w-3xl mx-auto px-4 py-8">
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-white">🏆 อันดับ &amp; สถิติ</h1>
@@ -112,7 +89,6 @@ function LeaderboardPage() {
           </Link>
         </div>
 
-        {/* Tabs */}
         <div className="flex bg-surface rounded-xl p-1 mb-5 w-fit gap-1">
           {(['ranking', 'history'] as Tab[]).map((t) => (
             <button key={t} onClick={() => setTab(t)}
@@ -125,7 +101,6 @@ function LeaderboardPage() {
           ))}
         </div>
 
-        {/* Game filter */}
         <div className="flex gap-2 flex-wrap mb-5">
           {GAMES.map((g) => (
             <button key={g.id} onClick={() => setGame(g.id)}
@@ -138,7 +113,6 @@ function LeaderboardPage() {
           ))}
         </div>
 
-        {/* Search (ranking only) */}
         {tab === 'ranking' && (
           <div className="relative mb-5">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-sm">🔍</span>
@@ -151,7 +125,6 @@ function LeaderboardPage() {
           </div>
         )}
 
-        {/* My stats summary */}
         {tab === 'history' && myStats && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
             {[
@@ -179,38 +152,48 @@ function LeaderboardPage() {
               <div className="text-center py-16 text-muted">ยังไม่มีข้อมูล</div>
             ) : (
               <>
-                {/* Column headers */}
                 <div className="flex items-center gap-2 px-4 py-1 text-[10px] uppercase tracking-widest text-muted">
                   <span className="w-8" />
                   <span className="flex-1">ผู้เล่น</span>
                   <span className="w-10 text-center text-green">ชนะ</span>
                   <span className="w-10 text-center text-red">แพ้</span>
                   <span className="w-10 text-center">เสมอ</span>
-                  <span className="w-12 text-center text-accent">อัตรา%</span>
-                  <span className="w-14 text-center">เกมรวม</span>
+                  <span className="w-20 text-center text-accent">อัตรา%</span>
+                  <span className="w-14 text-center">รวม</span>
                 </div>
-                {filteredRankings.map((row, i) => (
-                  <div key={row.player_name}
-                    className={`flex items-center gap-2 px-4 py-3 rounded-xl border transition-all ${
-                      i === 0 ? 'border-yellow-500/30 bg-yellow-500/5' :
-                      i === 1 ? 'border-gray-400/30 bg-gray-400/5' :
-                      i === 2 ? 'border-orange-700/30 bg-orange-700/5' :
-                      'border-white/8 bg-surface hover:border-white/15'
-                    }`}
-                  >
-                    <span className="text-xl w-8 text-center flex-shrink-0">
-                      {TROPHY[i] ?? <span className="text-sm text-muted">{i + 1}</span>}
-                    </span>
-                    <p className="flex-1 text-sm font-semibold text-white truncate">{row.player_name}</p>
-                    <span className="w-10 text-center text-sm font-bold text-green">{row.wins}</span>
-                    <span className="w-10 text-center text-sm text-red/80">{row.losses}</span>
-                    <span className="w-10 text-center text-sm text-muted">{row.draws}</span>
-                    <span className={`w-12 text-center text-sm font-bold ${row.winRate >= 60 ? 'text-accent' : 'text-white/60'}`}>
-                      {row.winRate}%
-                    </span>
-                    <span className="w-14 text-center text-xs text-muted">{row.total} เกม</span>
-                  </div>
-                ))}
+                {filteredRankings.map((row, i) => {
+                  const isMe = row.userId === user?.id
+                  return (
+                    <Link key={row.userId} href={`/profile/${row.userId}`}
+                      className={`flex items-center gap-2 px-4 py-3 rounded-xl border transition-all hover:border-white/25 ${
+                        isMe ? 'border-accent/40 bg-accent/5' :
+                        i === 0 ? 'border-yellow-500/30 bg-yellow-500/5' :
+                        i === 1 ? 'border-gray-400/30 bg-gray-400/5' :
+                        i === 2 ? 'border-orange-700/30 bg-orange-700/5' :
+                        'border-white/8 bg-surface'
+                      }`}
+                    >
+                      <span className="text-xl w-8 text-center flex-shrink-0">
+                        {TROPHY[i] ?? <span className="text-sm text-muted">{i + 1}</span>}
+                      </span>
+                      <p className={`flex-1 text-sm font-semibold truncate ${isMe ? 'text-accent' : 'text-white'}`}>
+                        {row.playerName}{isMe ? ' (คุณ)' : ''}
+                      </p>
+                      <span className="w-10 text-center text-sm font-bold text-green">{row.wins}</span>
+                      <span className="w-10 text-center text-sm text-red/80">{row.losses}</span>
+                      <span className="w-10 text-center text-sm text-muted">{row.draws}</span>
+                      <div className="w-20 flex flex-col items-center gap-0.5">
+                        <span className={`text-xs font-bold ${row.winRate >= 60 ? 'text-accent' : 'text-white/60'}`}>
+                          {row.winRate}%
+                        </span>
+                        <div className="w-full h-1 rounded-full bg-white/10 overflow-hidden">
+                          <div className="h-full rounded-full bg-accent" style={{ width: `${row.winRate}%` }} />
+                        </div>
+                      </div>
+                      <span className="w-14 text-center text-xs text-muted">{row.total}</span>
+                    </Link>
+                  )
+                })}
               </>
             )}
           </div>
@@ -227,6 +210,7 @@ function LeaderboardPage() {
           <div className="flex flex-col gap-2">
             {history.map((h) => {
               const badge = RESULT_BADGE[h.result]
+              const isBot = (h as GameResultRecord & { is_bot?: boolean }).is_bot
               return (
                 <div key={h.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-white/8 bg-surface hover:border-white/15 transition-colors">
                   <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border flex-shrink-0 ${badge.cls}`}>
@@ -234,7 +218,12 @@ function LeaderboardPage() {
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-white font-medium">{GAME_LABELS[h.game] ?? h.game}</p>
-                    <p className="text-xs text-muted">vs {h.opponent}</p>
+                    <p className="text-xs text-muted flex items-center gap-1.5">
+                      vs {h.opponent}
+                      {isBot && (
+                        <span className="px-1.5 py-0.5 rounded bg-purple/20 text-purple text-[10px] font-bold border border-purple/20">AI</span>
+                      )}
+                    </p>
                   </div>
                   {(h.score ?? 0) > 0 && (
                     <span className="text-xs font-bold text-accent bg-accent/10 px-2 py-0.5 rounded-lg">
