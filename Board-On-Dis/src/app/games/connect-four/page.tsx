@@ -19,7 +19,7 @@ import { COLOR_OPTIONS } from '@/types/room'
 import type { Board, Winner } from '@/lib/games/connect-four'
 
 function ConnectFourPage() {
-  const { playerName, avatarUrl, userId, isAuthenticated, roomId, mode, isHost } = usePlayerInfo()
+  const { playerName, avatarUrl, userId, isAuthenticated, roomId, mode, isHost, difficulty } = usePlayerInfo()
   const [board, setBoard] = useState<Board>(emptyBoard())
   const [currentTurn, setCurrentTurn] = useState<1 | 2>(1)
   const [winner, setWinner] = useState<Winner>(null)
@@ -74,7 +74,7 @@ function ConnectFourPage() {
     setAiThinking(true)
     fetch('/api/ai/connect-four', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ board }),
+      body: JSON.stringify({ board, difficulty }),
     })
       .then((r) => r.json())
       .then(({ col }: { col: number }) => {
@@ -136,7 +136,8 @@ function ConnectFourPage() {
   const myColor = myPlayer === 1 ? 'bg-red' : 'bg-accent'
   const oppColor = myPlayer === 1 ? 'bg-accent' : 'bg-red'
   const isMyActiveTurn = isMultiplayer ? isMyRoomTurn : !winner && currentTurn === myPlayer
-  const opponentName = isMultiplayer ? (opponentInfo?.name ?? 'รอผู้เล่น...') : 'AI (Claude)'
+  const diffLabel: Record<string, string> = { easy: 'ง่าย', medium: 'กลาง', hard: 'ยาก' }
+  const opponentName = isMultiplayer ? (opponentInfo?.name ?? 'รอผู้เล่น...') : `AI (${diffLabel[difficulty] ?? 'กลาง'})`
 
   // ---- MULTIPLAYER PHASE RENDERING ----
   if (isMultiplayer) {

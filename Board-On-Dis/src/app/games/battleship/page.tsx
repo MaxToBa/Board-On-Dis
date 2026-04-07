@@ -115,7 +115,7 @@ function PlacementGrid({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 function BattleshipPage() {
-  const { playerName, avatarUrl, userId, isAuthenticated, roomId, mode, isHost } = usePlayerInfo()
+  const { playerName, avatarUrl, userId, isAuthenticated, roomId, mode, isHost, difficulty } = usePlayerInfo()
 
   // My fleet
   const [myGrid, setMyGrid]   = useState<Grid>(emptyGrid())
@@ -218,7 +218,7 @@ function BattleshipPage() {
     if (mode!=='ai'||myTurn||winner||battlePhase!=='battle') return
     setAiThinking(true)
     setTimeout(()=>{
-      fetch('/api/ai/battleship',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({grid:myGrid}) })
+      fetch('/api/ai/battleship',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({grid:myGrid,difficulty}) })
         .then(r=>r.json()).then(({row,col}:{row:number;col:number})=>handleIncomingFire(row,col))
         .catch(()=>{
           const avail:[number,number][]=[]
@@ -537,7 +537,7 @@ function BattleshipPage() {
       topRight={
         <div className="flex flex-col items-end gap-2">
           <PlayerCard
-            name={isMultiplayer?(guestInfo?.name??'รอผู้เล่น...'):'AI (Claude)'}
+            name={isMultiplayer?(guestInfo?.name??'รอผู้เล่น...'):`AI (${({easy:'ง่าย',medium:'กลาง',hard:'ยาก'} as Record<string,string>)[difficulty]??'กลาง'})`}
             avatar={isMultiplayer?guestInfo?.avatarUrl:undefined}
             label="กองเรือศัตรู" active={myTurn&&!winner} flip
           />

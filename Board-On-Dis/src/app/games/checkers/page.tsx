@@ -19,7 +19,7 @@ import { COLOR_OPTIONS } from '@/types/room'
 import type { Board, Move } from '@/lib/games/checkers'
 
 function CheckersPage() {
-  const { playerName, avatarUrl, userId, isAuthenticated, roomId, mode, isHost } = usePlayerInfo()
+  const { playerName, avatarUrl, userId, isAuthenticated, roomId, mode, isHost, difficulty } = usePlayerInfo()
   const [board, setBoard] = useState<Board>(initialBoard())
   const [currentTurn, setCurrentTurn] = useState<1 | 2>(1)
   const [selected, setSelected] = useState<[number, number] | null>(null)
@@ -74,7 +74,7 @@ function CheckersPage() {
     setAiThinking(true)
     fetch('/api/ai/checkers', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ board }),
+      body: JSON.stringify({ board, difficulty }),
     })
       .then((r) => r.json())
       .then(({ moveIndex }: { moveIndex: number }) => {
@@ -149,7 +149,8 @@ function CheckersPage() {
   const cols = isFlipped ? [7,6,5,4,3,2,1,0] : [0,1,2,3,4,5,6,7]
   const isValidDest = (r: number, c: number) => validMoves.some((m) => m.to[0] === r && m.to[1] === c)
   const isMyActiveTurn = isMultiplayer ? isMyRoomTurn : currentTurn === myPlayer
-  const opponentName = isMultiplayer ? (opponentInfo?.name ?? 'รอผู้เล่น...') : 'AI (Claude)'
+  const diffLabel: Record<string, string> = { easy: 'ง่าย', medium: 'กลาง', hard: 'ยาก' }
+  const opponentName = isMultiplayer ? (opponentInfo?.name ?? 'รอผู้เล่น...') : `AI (${diffLabel[difficulty] ?? 'กลาง'})`
 
   // ---- MULTIPLAYER PHASE RENDERING ----
   if (isMultiplayer) {

@@ -22,6 +22,7 @@ export function usePlayerInfo() {
   const roomId = params.get('room') ?? ''
   const mode = (params.get('mode') ?? 'multiplayer') as 'ai' | 'solo' | 'multiplayer'
   const isHost = params.get('host') === '1'
+  const difficulty = (params.get('difficulty') ?? 'medium') as 'easy' | 'medium' | 'hard'
 
-  return { playerName, avatarUrl, userId, isAuthenticated, roomId, mode, isHost }
+  return { playerName, avatarUrl, userId, isAuthenticated, roomId, mode, isHost, difficulty }
 }

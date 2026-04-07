@@ -21,7 +21,7 @@ import type { Board, Winner } from '@/lib/games/tictactoe'
 const CELL_SYMBOLS = { X: '✕', O: '◯' }
 
 function TictactoePage() {
-  const { playerName, avatarUrl, userId, isAuthenticated, roomId, mode, isHost } = usePlayerInfo()
+  const { playerName, avatarUrl, userId, isAuthenticated, roomId, mode, isHost, difficulty } = usePlayerInfo()
 
   const [board, setBoard] = useState<Board>(Array(9).fill(null))
   const [currentTurn, setCurrentTurn] = useState<'X' | 'O'>('X')
@@ -96,7 +96,7 @@ function TictactoePage() {
     fetch('/api/ai/tictactoe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ board }),
+      body: JSON.stringify({ board, difficulty }),
     })
       .then((r) => r.json())
       .then(({ index }: { index: number }) => {
@@ -176,7 +176,8 @@ function TictactoePage() {
 
   // Compute status text
   const isMyActiveTurn = isMultiplayer ? isMyRoomTurn : currentTurn === mySymbol
-  const opponentName = isMultiplayer ? (opponentInfo?.name ?? 'รอผู้เล่น...') : 'AI (Claude)'
+  const diffLabel: Record<string, string> = { easy: 'ง่าย', medium: 'กลาง', hard: 'ยาก' }
+  const opponentName = isMultiplayer ? (opponentInfo?.name ?? 'รอผู้เล่น...') : `AI (${diffLabel[difficulty] ?? 'กลาง'})`
   const statusText = winner
     ? winner === 'draw' ? 'เสมอ!' : winner === mySymbol ? 'คุณชนะ! 🎉' : 'แพ้แล้ว...'
     : aiThinking ? 'AI กำลังคิด...'

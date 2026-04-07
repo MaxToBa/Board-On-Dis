@@ -19,8 +19,16 @@ interface GameModalProps {
 const SOLO_ONLY: GameType[] = ['2048']
 const COMING_SOON: GameType[] = ['chess']
 
+type Difficulty = 'easy' | 'medium' | 'hard'
+
+const DIFFICULTY_CONFIG: Record<Difficulty, { label: string; sub: string; icon: string; cls: string }> = {
+  easy:   { label: 'ง่าย',  sub: 'AI เล่นแบบสบายๆ เหมาะสำหรับมือใหม่',     icon: '😊', cls: 'border-green/30 hover:border-green/60 hover:bg-green/5' },
+  medium: { label: 'กลาง',  sub: 'AI ใช้ Claude — ท้าทายพอดี',              icon: '🤔', cls: 'border-white/15 hover:border-white/30 hover:bg-white/5' },
+  hard:   { label: 'ยาก',   sub: 'AI logic โหดสุดขีด — คุณพร้อมแล้วหรือยัง?', icon: '💀', cls: 'border-red/30 hover:border-red/60 hover:bg-red/5' },
+}
+
 export default function GameModal({ game, onClose }: GameModalProps) {
-  const [step, setStep] = useState<'select' | 'create' | 'join'>('select')
+  const [step, setStep] = useState<'select' | 'create' | 'join' | 'ai-difficulty'>('select')
   const [roomCode, setRoomCode] = useState('')
   const [createdCode, setCreatedCode] = useState('')
   const [loading, setLoading] = useState(false)
@@ -89,7 +97,13 @@ export default function GameModal({ game, onClose }: GameModalProps) {
   function startVsAI() {
     if (!game) return
     sound.click()
-    router.push(`/games/${game.id}?mode=ai&name=${encodeURIComponent(playerName)}`)
+    setStep('ai-difficulty')
+  }
+
+  function startVsAIWithDifficulty(difficulty: Difficulty) {
+    if (!game) return
+    sound.click()
+    router.push(`/games/${game.id}?mode=ai&difficulty=${difficulty}&name=${encodeURIComponent(playerName)}`)
     handleClose()
   }
 
@@ -131,7 +145,7 @@ export default function GameModal({ game, onClose }: GameModalProps) {
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              <ModeButton icon="🤖" title="เล่นกับ AI" sub="ฝึกฝีมือกับ Claude AI" onClick={startVsAI} />
+              <ModeButton icon="🤖" title="เล่นกับ AI" sub="ฝึกฝีมือ เลือกระดับความยากได้" onClick={startVsAI} />
               <ModeButton
                 icon="👥"
                 title="สร้างห้อง"
@@ -147,6 +161,42 @@ export default function GameModal({ game, onClose }: GameModalProps) {
               />
             </div>
           )}
+        </>
+      )}
+
+      {step === 'ai-difficulty' && (
+        <>
+          <div className="text-center mb-5">
+            <span className="text-5xl block mb-3">🤖</span>
+            <h2 className="text-xl font-display text-white">เลือกระดับความยาก</h2>
+            <p className="text-sm text-muted mt-1">{game.name} vs AI</p>
+          </div>
+          <div className="flex flex-col gap-3">
+            {(['easy', 'medium', 'hard'] as Difficulty[]).map((level) => {
+              const cfg = DIFFICULTY_CONFIG[level]
+              return (
+                <button
+                  key={level}
+                  onClick={() => startVsAIWithDifficulty(level)}
+                  className={`w-full bg-surface2 border rounded-xl p-4 text-left transition-all ${cfg.cls}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{cfg.icon}</span>
+                    <div>
+                      <p className="font-semibold text-white text-sm">{cfg.label}</p>
+                      <p className="text-xs text-muted mt-0.5">{cfg.sub}</p>
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+          <button
+            onClick={() => setStep('select')}
+            className="w-full text-center text-xs text-muted hover:text-white transition-colors mt-4"
+          >
+            ← กลับ
+          </button>
         </>
       )}
 

@@ -21,7 +21,7 @@ import type { Board, Winner } from '@/lib/games/gomoku'
 const SIZE = 15
 
 function GomokuPage() {
-  const { playerName, avatarUrl, userId, isAuthenticated, roomId, mode, isHost } = usePlayerInfo()
+  const { playerName, avatarUrl, userId, isAuthenticated, roomId, mode, isHost, difficulty } = usePlayerInfo()
   const [board, setBoard] = useState<Board>(emptyBoard())
   const [currentTurn, setCurrentTurn] = useState<1 | 2>(1)
   const [winner, setWinner] = useState<Winner>(null)
@@ -76,7 +76,7 @@ function GomokuPage() {
     fetch('/api/ai/gomoku', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ board, lastMove }),
+      body: JSON.stringify({ board, lastMove, difficulty }),
     })
       .then((r) => r.json())
       .then(({ move }: { move: [number, number] }) => handlePlace(move[0], move[1], true))
@@ -139,7 +139,8 @@ function GomokuPage() {
 
   const CELL = 28
   const isMyActiveTurn = isMultiplayer ? isMyRoomTurn : currentTurn === myPlayer
-  const opponentName = isMultiplayer ? (opponentInfo?.name ?? 'รอผู้เล่น...') : 'AI (Claude)'
+  const diffLabel: Record<string, string> = { easy: 'ง่าย', medium: 'กลาง', hard: 'ยาก' }
+  const opponentName = isMultiplayer ? (opponentInfo?.name ?? 'รอผู้เล่น...') : `AI (${diffLabel[difficulty] ?? 'กลาง'})`
 
   // ---- MULTIPLAYER PHASE RENDERING ----
   if (isMultiplayer) {
