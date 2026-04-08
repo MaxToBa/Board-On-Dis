@@ -21,6 +21,8 @@ interface UseMultiplayerRoomReturn {
   guestInfo: PlayerInRoom | null
   myInfo: PlayerInRoom | null
   opponentInfo: PlayerInRoom | null
+  allPlayers: PlayerInRoom[]           // all players including extras (2-4)
+  currentPlayerIndex: number           // index in allPlayers whose turn it is
   firstTurn: 'host' | 'guest' | null
   currentTurn: 'host' | 'guest'
   winner: 'host' | 'guest' | 'draw' | null
@@ -34,6 +36,7 @@ interface UseMultiplayerRoomReturn {
 
   isMyTurn: boolean
   myPlayerNum: 1 | 2   // 1 = goes first, 2 = goes second
+  myPlayerIndex: number // index in allPlayers (0-3)
 }
 
 export function useMultiplayerRoom({
@@ -137,8 +140,10 @@ export function useMultiplayerRoom({
       // Guest: read existing state
       if (state) {
         applyState(state)
-        // If we haven't joined yet (guest is null or different name), join now
-        if (!state.guest || state.guest.userId !== userId) {
+        // If we haven't joined yet, join as guest or extra player
+        const alreadyIn = state.guest?.userId === userId ||
+          (state.players ?? []).some((p) => p.userId === userId)
+        if (!alreadyIn) {
           await joinAsGuest(state)
         }
       }
@@ -147,24 +152,47 @@ export function useMultiplayerRoom({
 
   async function joinAsGuest(currentState: RoomState) {
     if (!roomIdRef.current) return
-    const guestInfo: PlayerInRoom = {
+
+    const EXTRA_COLORS = [
+      { color: 'amber',  colorBg: '#e8c547' },
+      { color: 'green',  colorBg: '#4fcf8e' },
+      { color: 'pink',   colorBg: '#ec4899' },
+    ]
+
+    const newPlayer: PlayerInRoom = {
       userId,
       name: playerName,
       avatarUrl,
       ready: false,
       color: 'amber',
       colorBg: '#e8c547',
-      score: currentState.guest?.score ?? 0,
+      score: 0,
     }
-    const newState: RoomState = {
-      ...currentState,
-      phase: 'setup',
-      guest: guestInfo,
+
+    let newState: RoomState
+    if (!currentState.guest) {
+      // Slot 1: become the guest
+      newState = { ...currentState, phase: 'setup', guest: newPlayer }
+    } else {
+      // Slots 2-3: join as extra player
+      const existing = currentState.players ?? [currentState.host, currentState.guest]
+      const slotIndex = existing.length  // 2 = 3rd player, 3 = 4th player
+      if (slotIndex >= 4) return         // max 4 players
+      const colorSlot = EXTRA_COLORS[slotIndex - 2] ?? EXTRA_COLORS[0]
+      newPlayer.color = colorSlot.color
+      newPlayer.colorBg = colorSlot.colorBg
+      newState = {
+        ...currentState,
+        phase: 'setup',
+        players: [...existing, newPlayer],
+      }
     }
+
+    const allNames = [currentState.host.name, ...(newState.players ?? [newState.guest]).filter(Boolean).map((p) => (p as PlayerInRoom).name)]
     await supabase.from('rooms').update({
       state: newState,
       status: 'setup',
-      players: [currentState.host.name, playerName],
+      players: allNames,
       updated_at: new Date().toISOString(),
     }).eq('id', roomIdRef.current)
     applyState(newState)
@@ -232,30 +260,41 @@ export function useMultiplayerRoom({
     const current = (data?.state as RoomState) ?? roomStateRef.current
     if (!current) return
 
-    const currentPlayer = isHost ? current.host : (current.guest ?? current.host)
+    // Find and update my player record
+    const allPlayers = current.players ?? [current.host, ...(current.guest ? [current.guest] : [])]
+    const myIdx = allPlayers.findIndex((p) => p.userId === userId || p.name === playerName)
     const updatedPlayer: PlayerInRoom = {
-      ...currentPlayer,
+      ...(myIdx >= 0 ? allPlayers[myIdx] : (isHost ? current.host : current.guest ?? current.host)),
       ready: true,
       color,
       colorBg: colorBgFromValue(color),
     }
-    const updated: RoomState = isHost
-      ? { ...current, host: updatedPlayer }
-      : { ...current, guest: updatedPlayer }
 
-    const otherReady = isHost
-      ? (updated.guest?.ready ?? false)
-      : updated.host.ready
+    let updated: RoomState
+    if (isHost) {
+      updated = { ...current, host: updatedPlayer }
+    } else if (current.players) {
+      const newPlayers = current.players.map((p, i) => i === myIdx ? updatedPlayer : p)
+      updated = { ...current, players: newPlayers, guest: myIdx === 1 ? updatedPlayer : current.guest }
+    } else {
+      updated = { ...current, guest: updatedPlayer }
+    }
 
-    if (otherReady && updated.guest) {
+    // Check if ALL players are ready
+    const playersToCheck = updated.players ?? [updated.host, ...(updated.guest ? [updated.guest] : [])]
+    const allReady = playersToCheck.length >= 2 && playersToCheck.every((p) => p.ready)
+
+    if (allReady) {
       const firstTurn: 'host' | 'guest' = Math.random() < 0.5 ? 'host' : 'guest'
+      const firstIndex = firstTurn === 'host' ? 0 : 1
       updated.phase = 'coin_flip'
       updated.firstTurn = firstTurn
       updated.currentTurn = firstTurn
+      updated.currentPlayerIndex = firstIndex
     }
 
     await pushState(updated)
-  }, [isHost, pushState]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isHost, userId, playerName, pushState]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateGameData = useCallback(async (data: Record<string, unknown>) => {
     if (!roomIdRef.current || !roomStateRef.current) return
@@ -313,10 +352,15 @@ export function useMultiplayerRoom({
   const phase = roomState?.phase ?? 'waiting'
   const hostInfo = roomState?.host ?? null
   const guestInfo = roomState?.guest ?? null
-  const myInfo = isHost ? hostInfo : guestInfo
+  const allPlayers: PlayerInRoom[] = roomState?.players
+    ?? [hostInfo, ...(guestInfo ? [guestInfo] : [])].filter(Boolean) as PlayerInRoom[]
+  const myInfo = isHost ? hostInfo : (roomState?.players
+    ? roomState.players.find((p) => p.userId === userId || p.name === playerName) ?? guestInfo
+    : guestInfo)
   const opponentInfo = isHost ? guestInfo : hostInfo
   const firstTurn = roomState?.firstTurn ?? null
   const currentTurn = roomState?.currentTurn ?? 'host'
+  const currentPlayerIndex = roomState?.currentPlayerIndex ?? (currentTurn === 'host' ? 0 : 1)
   const winner = roomState?.winner ?? null
   const rematchVotes = roomState?.rematchVotes ?? []
   const isMyTurn = currentTurn === (isHost ? 'host' : 'guest')
@@ -325,6 +369,7 @@ export function useMultiplayerRoom({
   const myPlayerNum: 1 | 2 = firstTurn === null
     ? (isHost ? 1 : 2)
     : firstTurn === myRole ? 1 : 2
+  const myPlayerIndex = allPlayers.findIndex((p) => p.userId === userId || p.name === playerName)
 
   return {
     phase,
@@ -332,6 +377,8 @@ export function useMultiplayerRoom({
     guestInfo,
     myInfo,
     opponentInfo,
+    allPlayers,
+    currentPlayerIndex,
     firstTurn,
     currentTurn,
     winner,
@@ -343,5 +390,6 @@ export function useMultiplayerRoom({
     requestRematch,
     isMyTurn,
     myPlayerNum,
+    myPlayerIndex: myPlayerIndex >= 0 ? myPlayerIndex : (isHost ? 0 : 1),
   }
 }

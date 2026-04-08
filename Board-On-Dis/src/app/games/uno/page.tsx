@@ -60,15 +60,23 @@ function UnoPage() {
 
   const isMultiplayer = mode === 'multiplayer' && !!roomId
 
-  // Multiplayer: track both hands (storing full arrays from DB)
+  // Multiplayer: track opponents' hand sizes and extra players
   const [opponentHandCount, setOpponentHandCount] = useState(7)
   const [opponentHand, setOpponentHand] = useState<Card[]>([])
+  // For 3-4 player: extra players' hand counts by playerIndex
+  const [extraHandCounts, setExtraHandCounts] = useState<number[]>([])
+  const [unoPlayerIndex, setUnoPlayerIndex] = useState(0)   // whose turn (index in allPlayers)
+  const [direction, setDirection] = useState<1 | -1>(1)     // 1=clockwise, -1=counter
+
+  const HAND_KEYS = ['hostHand', 'guestHand', 'hand2', 'hand3']
 
   // ── Multiplayer room hook ──
   const {
     phase, hostInfo, guestInfo, myInfo, opponentInfo,
+    allPlayers, currentPlayerIndex: roomPlayerIndex,
     currentTurn: roomTurn, winner: roomWinner,
-    rematchVotes,
+    rematchVotes, isMyTurn: isMyRoomTurn,
+    myPlayerIndex,
     markReady, updateGameData, finishGame, requestRematch,
   } = useMultiplayerRoom({
     roomId: isMultiplayer ? roomId : '',
@@ -78,61 +86,87 @@ function UnoPage() {
     userId,
     onGameStateChange: useCallback((state: Record<string, unknown>) => {
       if (!isMultiplayer) return
-      // Sync shared game state from DB
-      const myHandKey  = isHost ? 'hostHand'  : 'guestHand'
-      const oppHandKey = isHost ? 'guestHand' : 'hostHand'
+      // Use player index to find my hand key (supports 2-4 players)
+      const myIdx = (state.myPlayerIndex as number | undefined) ?? (isHost ? 0 : 1)
+      const myHandKey = HAND_KEYS[myIdx] ?? 'hostHand'
 
       if (state[myHandKey]) setHand(state[myHandKey] as Card[])
-      if (state[oppHandKey]) {
-        const oppH = state[oppHandKey] as Card[]
-        setOpponentHand(oppH)
-        setOpponentHandCount(oppH.length)
+
+      // Sync opponents' hand sizes
+      HAND_KEYS.forEach((key, idx) => {
+        if (idx !== myIdx && state[key]) {
+          const h = state[key] as Card[]
+          if (idx === (myIdx === 0 ? 1 : 0)) {
+            setOpponentHand(h); setOpponentHandCount(h.length)
+          } else {
+            setExtraHandCounts(prev => { const a = [...prev]; a[idx] = h.length; return a })
+          }
+        }
+      })
+
+      if (state.deck)               setDeck(state.deck as Card[])
+      if (state.discard)            setDiscard(state.discard as Card[])
+      if (state.activeColor)        setActiveColor(state.activeColor as Color)
+      if (state.unoPlayerIndex !== undefined) setUnoPlayerIndex(state.unoPlayerIndex as number)
+      if (state.direction !== undefined)      setDirection(state.direction as 1 | -1)
+      if (state.gameStarted)        setGameStarted(true)
+      // Derive myTurn from unoPlayerIndex
+      if (state.unoPlayerIndex !== undefined) {
+        setMyTurn((state.unoPlayerIndex as number) === myIdx)
       }
-      if (state.deck)        setDeck(state.deck as Card[])
-      if (state.discard)     setDiscard(state.discard as Card[])
-      if (state.activeColor) setActiveColor(state.activeColor as Color)
-      if (state.currentTurn) setMyTurn(state.currentTurn === (isHost ? 'host' : 'guest'))
-      if (state.gameStarted) setGameStarted(true)
     }, [isMultiplayer, isHost]),
   })
 
-  // ── Show coin flip when phase changes to coin_flip ──
+  // True turn check: supports 2-4 players
+  const isMyUnoTurn = isMultiplayer
+    ? (allPlayers.length <= 2 ? isMyRoomTurn : unoPlayerIndex === myPlayerIndex)
+    : myTurn
+
+  // ── Show coin flip when phase changes to coin_flip (AI mode only — multiplayer uses early return) ──
   useEffect(() => {
     if (!isMultiplayer || phase !== 'coin_flip' || !hostInfo || !guestInfo) return
-    const firstPlayerName = roomTurn === 'host' ? hostInfo.name : guestInfo.name
-    setCoinWinner(firstPlayerName)
-  }, [phase, isMultiplayer]) // eslint-disable-line react-hooks/exhaustive-deps
+    const iGoFirst = roomTurn === (isHost ? 'host' : 'guest')
+    setCoinWinner(iGoFirst ? 'คุณ' : (isHost ? guestInfo.name : hostInfo.name))
+  }, [phase, isMultiplayer, roomTurn]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── When playing phase starts: host deals cards ──
   useEffect(() => {
     if (!isMultiplayer || phase !== 'playing' || gameStarted) return
     if (!isHost) return  // only host deals
     const d = createDeck()
-    const hostCards  = d.splice(0, 7)
-    const guestCards = d.splice(0, 7)
+    const playerCount = allPlayers.length || 2
+    const hands: Card[][] = []
+    for (let i = 0; i < playerCount; i++) hands.push(d.splice(0, 7))
     let topCard = d.splice(0, 1)[0]
     while (topCard.type === 'wild4') { d.push(topCard); topCard = d.splice(0, 1)[0] }
-    const firstTurnRole = roomTurn  // from coin flip
 
-    // Store in DB
-    updateGameData({
-      hostHand:    hostCards,
-      guestHand:   guestCards,
-      deck:        d,
-      discard:     [topCard],
+    // Determine starting player index (0=host, 1=guest based on firstTurn)
+    const startIdx = roomTurn === 'host' ? 0 : 1
+
+    const updates: Record<string, unknown> = {
+      deck: d,
+      discard: [topCard],
       activeColor: topCard.color === 'wild' ? 'red' : topCard.color,
-      currentTurn: firstTurnRole,
+      currentTurn: roomTurn,
+      unoPlayerIndex: startIdx,
+      direction: 1,
       gameStarted: true,
-    })
-    // Set local state for host
-    setHand(hostCards)
-    setOpponentHandCount(guestCards.length)
+      myPlayerIndex: 0,  // host's index (each player reads their own)
+    }
+    hands.forEach((h, i) => { updates[HAND_KEYS[i]] = h })
+
+    updateGameData(updates)
+    setHand(hands[0])  // host's hand
+    if (hands[1]) { setOpponentHand(hands[1]); setOpponentHandCount(hands[1].length) }
+    hands.slice(2).forEach((h, i) => setExtraHandCounts(prev => { const a = [...prev]; a[i+2] = h.length; return a }))
     setDeck(d)
     setDiscard([topCard])
     setActiveColor(topCard.color === 'wild' ? 'red' : topCard.color)
-    setMyTurn(firstTurnRole === 'host')
+    setUnoPlayerIndex(startIdx)
+    setDirection(1)
+    setMyTurn(startIdx === 0)
     setGameStarted(true)
-  }, [phase, isMultiplayer, isHost, gameStarted, roomTurn]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [phase, isMultiplayer, isHost, gameStarted, roomTurn, allPlayers.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── AI mode: init game ──
   useEffect(() => {
@@ -145,8 +179,8 @@ function UnoPage() {
     setDeck(d); setHand(myCards); setAiHand(aiCards)
     setDiscard([topCard]); setActiveColor(topCard.color === 'wild' ? 'red' : topCard.color)
     const aiFirst = Math.random() < 0.5
-    setMyTurn(!aiFirst) // if AI first, player doesn't go first
-    setTimeout(() => setCoinWinner(aiFirst ? 'AI' : playerName), 300)
+    setMyTurn(!aiFirst)
+    setTimeout(() => setCoinWinner(aiFirst ? 'AI' : 'คุณ'), 300)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── AI turn ──
@@ -197,6 +231,7 @@ function UnoPage() {
 
   function playCard(card: Card) {
     if (!myTurn || !gameStarted) return
+    if (isMultiplayer && !isMyUnoTurn) return
     const topCard = discard[discard.length - 1]
     if (!canPlay(card, topCard, activeColor)) return
     sound.cardPlay()
@@ -228,32 +263,51 @@ function UnoPage() {
     setHand(newHand); setDiscard(newDiscard); setActiveColor(color)
 
     if (isMultiplayer) {
-      const myHandKey  = isHost ? 'hostHand' : 'guestHand'
-      const oppHandKey = isHost ? 'guestHand' : 'hostHand'
-      let nextTurn: 'host' | 'guest' = isHost ? 'guest' : 'host'
+      const playerCount = allPlayers.length || 2
+      const myIdx = myPlayerIndex
+      const myHandKey = HAND_KEYS[myIdx]
 
-      if (card.type === 'skip' || card.type === 'reverse') {
-        nextTurn = isHost ? 'host' : 'guest'  // skip opponent's turn
+      // Compute next player index (circular)
+      let newDirection = direction
+      let skip = false
+      let drawCount = 0
+
+      if (card.type === 'reverse') {
+        newDirection = playerCount === 2 ? direction : (direction === 1 ? -1 : 1) as 1 | -1
+        if (playerCount === 2) skip = true  // reverse acts as skip in 2-player
       }
+      if (card.type === 'skip') skip = true
+      if (card.type === 'draw2') { drawCount = 2; skip = true }
+
+      const nextIdx = skip
+        ? (myIdx + newDirection * 2 + playerCount * 2) % playerCount
+        : (myIdx + newDirection + playerCount) % playerCount
+      const nextIsHost = nextIdx === 0
+      const nextTurn: 'host' | 'guest' = nextIsHost ? 'host' : 'guest'
 
       const updates: Record<string, unknown> = {
         [myHandKey]: newHand,
         discard: newDiscard,
         activeColor: color,
         currentTurn: nextTurn,
+        unoPlayerIndex: nextIdx,
+        direction: newDirection,
       }
 
-      if (card.type === 'draw2') {
-        // Draw 2 from deck for opponent, skip their turn
-        const drawn = deck.slice(0, 2)
-        const newDeck = deck.slice(2)
+      if (drawCount > 0) {
+        const victimIdx = (myIdx + newDirection + playerCount) % playerCount
+        const victimKey = HAND_KEYS[victimIdx]
+        const victimHand = victimIdx === (myIdx === 0 ? 1 : 0) ? opponentHand : []
+        const drawn = deck.slice(0, drawCount)
+        const newDeck = deck.slice(drawCount)
+        updates[victimKey] = [...victimHand, ...drawn]
         updates.deck = newDeck
-        updates[oppHandKey] = [...opponentHand, ...drawn]
-        updates.currentTurn = isHost ? 'host' : 'guest'  // opponent turn skipped
         setDeck(newDeck)
       }
 
-      setMyTurn(nextTurn === (isHost ? 'host' : 'guest'))
+      setUnoPlayerIndex(nextIdx)
+      setDirection(newDirection)
+      setMyTurn(nextIdx === myIdx)
       updateGameData(updates)
       return
     }
@@ -272,43 +326,64 @@ function UnoPage() {
     sound.cardPlay()
 
     if (isMultiplayer) {
-      const myHandKey = isHost ? 'hostHand' : 'guestHand'
-      const oppHandKey = isHost ? 'guestHand' : 'hostHand'
-      const nextTurn: 'host' | 'guest' = pendingCard.type === 'wild4'
-        ? (isHost ? 'host' : 'guest')  // wild4 skips opponent
-        : (isHost ? 'guest' : 'host')
+      const playerCount = allPlayers.length || 2
+      const myIdx = myPlayerIndex
+      const myHandKey = HAND_KEYS[myIdx]
+
+      // wild4: skip next player (they draw 4); wild: normal next turn
+      const skip = pendingCard.type === 'wild4'
+      const nextIdx = skip
+        ? (myIdx + direction * 2 + playerCount * 2) % playerCount
+        : (myIdx + direction + playerCount) % playerCount
+      const nextTurn: 'host' | 'guest' = nextIdx === 0 ? 'host' : 'guest'
+
       const updates: Record<string, unknown> = {
         [myHandKey]: hand,
         discard: newDiscard,
         activeColor: color,
         currentTurn: nextTurn,
+        unoPlayerIndex: nextIdx,
+        direction,
       }
+
       if (pendingCard.type === 'wild4') {
+        const victimIdx = (myIdx + direction + playerCount) % playerCount
+        const victimKey = HAND_KEYS[victimIdx]
+        const victimHand = victimIdx === (myIdx === 0 ? 1 : 0) ? opponentHand : []
         const drawn = deck.slice(0, 4)
         const newDeck = deck.slice(4)
+        updates[victimKey] = [...victimHand, ...drawn]
         updates.deck = newDeck
-        updates[oppHandKey] = [...opponentHand, ...drawn]
         setDeck(newDeck)
       }
-      setMyTurn(nextTurn === (isHost ? 'host' : 'guest'))
+
+      setUnoPlayerIndex(nextIdx)
+      setMyTurn(nextIdx === myIdx)
       updateGameData(updates)
     } else {
-      if (pendingCard.type === 'wild4') drawCards(4, false)
+      // AI mode: wild4 skips AI's turn (AI draws 4, player keeps turn)
+      if (pendingCard.type === 'wild4') { drawCards(4, false); return }
+      // Normal wild: turn passes to AI
       setMyTurn(false)
     }
   }
 
   function drawFromDeck() {
     if (!myTurn || !gameStarted) return
+    if (isMultiplayer && !isMyUnoTurn) return
     const [card, ...rest] = deck
     if (!card) return
     setDeck(rest); setHand([...hand, card]); sound.move()
 
     if (isMultiplayer) {
-      const myHandKey = isHost ? 'hostHand' : 'guestHand'
-      const nextTurn: 'host' | 'guest' = isHost ? 'guest' : 'host'
-      updateGameData({ [myHandKey]: [...hand, card], deck: rest, currentTurn: nextTurn })
+      const playerCount = allPlayers.length || 2
+      const myIdx = myPlayerIndex
+      const myHandKey = HAND_KEYS[myIdx]
+      const nextIdx = (myIdx + direction + playerCount) % playerCount
+      const nextTurn: 'host' | 'guest' = nextIdx === 0 ? 'host' : 'guest'
+      setUnoPlayerIndex(nextIdx)
       setMyTurn(false)
+      updateGameData({ [myHandKey]: [...hand, card], deck: rest, currentTurn: nextTurn, unoPlayerIndex: nextIdx })
     } else {
       setMyTurn(false)
     }
@@ -343,14 +418,18 @@ function UnoPage() {
             myInfo={myInfo ?? null} opponentInfo={opponentInfo ?? null}
             colorOptions={COLOR_OPTIONS} selectedColor={selectedColor}
             onSelectColor={setSelectedColor} onReady={() => markReady(selectedColor)}
+            showColorPicker={false}
           />
+          <ChatBox roomId={roomId} playerName={playerName} playerAvatar={avatarUrl}/>
         </GameLayout>
       )
     if (phase === 'coin_flip') {
-      const fpName = roomTurn === 'host' ? (hostInfo?.name ?? '') : (guestInfo?.name ?? '')
+      const iGoFirst = roomTurn === (isHost ? 'host' : 'guest')
+      const fpName = iGoFirst ? 'คุณ' : (isHost ? guestInfo?.name : hostInfo?.name) ?? 'เพื่อน'
       return (
         <GameLayout title="UNO">
           <CoinFlip winner={fpName} onDone={() => setCoinWinner(null)}/>
+          <ChatBox roomId={roomId} playerName={playerName} playerAvatar={avatarUrl}/>
         </GameLayout>
       )
     }
@@ -370,21 +449,21 @@ function UnoPage() {
           : myTurn ? 'ตาของคุณ'
           : `ตาของ${isMultiplayer ? (opponentInfo?.name ?? 'เพื่อน') : 'AI'}`
       }
-      statusColor={winner ? (isWinnerMe ? 'green' : 'red') : myTurn ? 'accent' : 'default'}
+      statusColor={winner ? (isWinnerMe ? 'green' : 'red') : isMyUnoTurn ? 'accent' : 'default'}
       topLeft={
         <PlayerCard
           name={isMultiplayer ? (hostInfo?.name ?? playerName) : playerName}
           avatar={isMultiplayer ? hostInfo?.avatarUrl : avatarUrl}
-          label={`ไพ่ ${isMultiplayer ? (isHost ? hand.length : opponentHandCount) : hand.length} ใบ`}
-          active={isMultiplayer ? roomTurn === 'host' && !winner : myTurn && !winner}
+          label={`ไพ่ ${isMultiplayer ? (myPlayerIndex === 0 ? hand.length : (allPlayers[0] ? extraHandCounts[0] ?? opponentHandCount : 0)) : hand.length} ใบ`}
+          active={isMultiplayer ? unoPlayerIndex === 0 && !winner : myTurn && !winner}
         />
       }
       topRight={
         <PlayerCard
           name={isMultiplayer ? (guestInfo?.name ?? 'รอผู้เล่น...') : 'AI'}
           avatar={isMultiplayer ? guestInfo?.avatarUrl : undefined}
-          label={`ไพ่ ${isMultiplayer ? (isHost ? opponentHandCount : hand.length) : aiHand.length} ใบ`}
-          active={isMultiplayer ? roomTurn === 'guest' && !winner : !myTurn && !winner}
+          label={`ไพ่ ${isMultiplayer ? (myPlayerIndex === 1 ? hand.length : opponentHandCount) : aiHand.length} ใบ`}
+          active={isMultiplayer ? unoPlayerIndex === 1 && !winner : !myTurn && !winner}
           flip
         />
       }
@@ -394,6 +473,22 @@ function UnoPage() {
           myName={playerName} rematchVotes={rematchVotes} onRematch={handleRematch}/>
       )}
       <Confetti active={isWinnerMe && (mode === 'ai' || phase === 'finished')}/>
+
+      {/* Extra players (3rd and 4th) shown as top strip */}
+      {isMultiplayer && allPlayers.length > 2 && (
+        <div className="flex gap-2 justify-center mb-3">
+          {allPlayers.slice(2).map((p, i) => {
+            const idx = i + 2
+            const count = myPlayerIndex === idx ? hand.length : (extraHandCounts[idx] ?? 7)
+            return (
+              <div key={idx} className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs ${unoPlayerIndex === idx ? 'border-accent/60 bg-accent/10' : 'border-white/10 bg-surface'}`}>
+                <span className="font-bold text-white">{p.name}</span>
+                <span className="text-muted">ไพ่ {count} ใบ</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Opponent card backs */}
       <div className="flex justify-center mb-3">
@@ -498,7 +593,7 @@ function UnoPage() {
         const aiFirst = Math.random() < 0.5
         setMyTurn(!aiFirst)
         setGameStarted(false)
-        setTimeout(() => setCoinWinner(aiFirst ? 'AI' : playerName), 300)
+        setTimeout(() => setCoinWinner(aiFirst ? 'AI' : 'คุณ'), 300)
       }}
         />
       )}

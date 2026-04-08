@@ -47,7 +47,13 @@ function CheckersPage() {
     avatarUrl,
     userId,
     onGameStateChange: useCallback((state: Record<string, unknown>) => {
-      if (state.board) { setBoard(state.board as Board); setGameStarted(true) }
+      if (state.board) {
+        setBoard(state.board as Board)
+        setGameStarted(true)
+        setWinner(null)
+        setSelected(null)
+        setValidMoves([])
+      }
       if (state.currentGameTurn) setCurrentTurn(state.currentGameTurn as 1 | 2)
     }, []),
   })
@@ -59,16 +65,16 @@ function CheckersPage() {
 
   useEffect(() => {
     if (!isMultiplayer || phase !== 'coin_flip' || !hostInfo || !guestInfo) return
-    const firstPlayerName = roomTurn === 'host' ? hostInfo.name : guestInfo.name
-    setCoinWinner(firstPlayerName)
-  }, [phase, isMultiplayer]) // eslint-disable-line react-hooks/exhaustive-deps
+    const iGoFirst = roomTurn === (isHost ? 'host' : 'guest')
+    setCoinWinner(iGoFirst ? 'คุณ' : (isHost ? guestInfo.name : hostInfo.name))
+  }, [phase, isMultiplayer, roomTurn]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (mode !== 'ai' || gameStarted) return
     const aiFirst = Math.random() < 0.5
-    setMyPlayer(1) // player always 1, AI always 2
+    setMyPlayer(1)
     if (aiFirst) setCurrentTurn(2)
-    setTimeout(() => setCoinWinner(aiFirst ? 'AI' : playerName), 300)
+    setTimeout(() => setCoinWinner(aiFirst ? 'AI' : 'คุณ'), 300)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -163,21 +169,21 @@ function CheckersPage() {
       return (
         <GameLayout title="หมากฮอส">
           <SetupRoom
-            myInfo={myInfo ?? null}
-            opponentInfo={opponentInfo ?? null}
-            colorOptions={COLOR_OPTIONS}
-            selectedColor={selectedColor}
-            onSelectColor={setSelectedColor}
-            onReady={() => markReady(selectedColor)}
+            myInfo={myInfo ?? null} opponentInfo={opponentInfo ?? null}
+            colorOptions={COLOR_OPTIONS} selectedColor={selectedColor}
+            onSelectColor={setSelectedColor} onReady={() => markReady(selectedColor)}
           />
+          <ChatBox roomId={roomId} playerName={playerName} playerAvatar={avatarUrl} />
         </GameLayout>
       )
     }
     if (phase === 'coin_flip') {
-      const firstPlayerName = roomTurn === 'host' ? (hostInfo?.name ?? '') : (guestInfo?.name ?? '')
+      const iGoFirst = roomTurn === (isHost ? 'host' : 'guest')
+      const fpName = iGoFirst ? 'คุณ' : (isHost ? guestInfo?.name : hostInfo?.name) ?? 'เพื่อน'
       return (
         <GameLayout title="หมากฮอส">
-          <CoinFlip winner={firstPlayerName} onDone={() => { setCoinWinner(null); setGameStarted(true) }} />
+          <CoinFlip winner={fpName} onDone={() => { setCoinWinner(null); setGameStarted(true) }} />
+          <ChatBox roomId={roomId} playerName={playerName} playerAvatar={avatarUrl} />
         </GameLayout>
       )
     }
@@ -272,7 +278,7 @@ function CheckersPage() {
           onRestart={() => {
             const aiFirst = Math.random() < 0.5
             setBoard(initialBoard()); setWinner(null); setCurrentTurn(aiFirst ? 2 : 1); setSelected(null); setValidMoves([]); setGameStarted(false)
-            setTimeout(() => setCoinWinner(aiFirst ? 'AI' : playerName), 300)
+            setTimeout(() => setCoinWinner(aiFirst ? 'AI' : 'คุณ'), 300)
           }}
         />
       )}

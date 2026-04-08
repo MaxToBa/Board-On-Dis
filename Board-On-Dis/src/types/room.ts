@@ -20,8 +20,12 @@ export interface RoomState {
   phase: RoomPhase
   host: PlayerInRoom
   guest: PlayerInRoom | null
+  /** Extended players list for 3-4 player games (UNO). Index 0=host, 1=guest, 2+=extra */
+  players?: PlayerInRoom[]
   firstTurn: 'host' | 'guest' | null   // set after coin flip
   currentTurn: 'host' | 'guest'
+  /** For 3-4 player games: index into players[] for whose turn it is */
+  currentPlayerIndex?: number
   winner: 'host' | 'guest' | 'draw' | null
   rematchVotes: string[]                // player names who voted rematch
   [key: string]: unknown               // game-specific fields mixed in
@@ -45,5 +49,6 @@ export const COLOR_OPTIONS: ColorOption[] = [
 ]
 
 export function colorBgFromValue(value: string): string {
+  if (value.startsWith('#')) return value  // custom hex color
   return COLOR_OPTIONS.find((c) => c.value === value)?.bg ?? '#7c6af5'
 }

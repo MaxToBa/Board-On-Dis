@@ -182,9 +182,9 @@ function BattleshipPage() {
   // When coin_flip phase → show coin flip animation
   useEffect(() => {
     if (!isMultiplayer || phase !== 'coin_flip' || !hostInfo || !guestInfo) return
-    const firstPlayerName = roomTurn === 'host' ? hostInfo.name : guestInfo.name
-    setCoinWinner(firstPlayerName)
-  }, [phase, isMultiplayer]) // eslint-disable-line react-hooks/exhaustive-deps
+    const iGoFirst = roomTurn === (isHost ? 'host' : 'guest')
+    setCoinWinner(iGoFirst ? 'คุณ' : (isHost ? guestInfo.name : hostInfo.name))
+  }, [phase, isMultiplayer, roomTurn]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // When playing phase starts → go to ship placement
   useEffect(() => {
@@ -211,7 +211,7 @@ function BattleshipPage() {
     const enemyG  = emptyGrid()
     enemySh.forEach(s=>s.positions.forEach(([r,c])=>{ enemyG[r][c]='ship' }))
     setEnemyShips(enemySh); setEnemyGrid(enemyG)
-    setTimeout(()=>{ setCoinWinner(Math.random()<0.5?playerName:'AI'); setBattlePhase('battle') },300)
+    setTimeout(()=>{ setCoinWinner(Math.random()<0.5?'คุณ':'AI'); setBattlePhase('battle') },300)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // AI takes shot
@@ -380,14 +380,18 @@ function BattleshipPage() {
             myInfo={myInfo??null} opponentInfo={opponentInfo??null}
             colorOptions={COLOR_OPTIONS} selectedColor={selectedColor}
             onSelectColor={setSelectedColor} onReady={()=>markReady(selectedColor)}
+            showColorPicker={false}
           />
+          <ChatBox roomId={roomId} playerName={playerName} playerAvatar={avatarUrl}/>
         </GameLayout>
       )
     if(phase==='coin_flip'){
-      const fpName=roomTurn==='host'?(hostInfo?.name??''):(guestInfo?.name??'')
+      const iGoFirst = roomTurn === (isHost ? 'host' : 'guest')
+      const fpName = iGoFirst ? 'คุณ' : (isHost ? guestInfo?.name : hostInfo?.name) ?? 'เพื่อน'
       return (
         <GameLayout title="Battle Ship">
           <CoinFlip winner={fpName} onDone={()=>{ setCoinWinner(null) }}/>
+          <ChatBox roomId={roomId} playerName={playerName} playerAvatar={avatarUrl}/>
         </GameLayout>
       )
     }

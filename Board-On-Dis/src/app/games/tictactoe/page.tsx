@@ -32,7 +32,7 @@ function TictactoePage() {
   const [gameStarted, setGameStarted] = useState(false)
   const [mySymbol, setMySymbol] = useState<'X' | 'O'>('X')
   const [aiThinking, setAiThinking] = useState(false)
-  const [scores, setScores] = useState({ X: 0, O: 0 })
+  const [scores, setScores] = useState({ player: 0, ai: 0 })
   const [selectedColor, setSelectedColor] = useState('purple')
 
   const isMultiplayer = mode === 'multiplayer' && !!roomId
@@ -50,7 +50,12 @@ function TictactoePage() {
     avatarUrl,
     userId,
     onGameStateChange: useCallback((state: Record<string, unknown>) => {
-      if (state.board) { setBoard(state.board as Board); setGameStarted(true) }
+      if (state.board) {
+        setBoard(state.board as Board)
+        setGameStarted(true)
+        setWinner(null)   // Bug 7: reset winner on rematch
+        setWinLine(null)
+      }
       if (state.currentGameTurn) setCurrentTurn(state.currentGameTurn as 'X' | 'O')
     }, []),
   })
@@ -67,9 +72,9 @@ function TictactoePage() {
   useEffect(() => {
     if (!isMultiplayer || phase !== 'coin_flip') return
     if (!hostInfo || !guestInfo) return
-    const firstPlayerName = roomTurn === 'host' ? hostInfo.name : guestInfo.name
-    setCoinWinner(firstPlayerName)
-  }, [phase, isMultiplayer]) // eslint-disable-line react-hooks/exhaustive-deps
+    const iGoFirst = roomTurn === (isHost ? 'host' : 'guest')
+    setCoinWinner(iGoFirst ? 'คุณ' : (isHost ? guestInfo.name : hostInfo.name))
+  }, [phase, isMultiplayer, roomTurn]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // When phase moves to playing (after coin flip), start game
   useEffect(() => {
@@ -83,10 +88,8 @@ function TictactoePage() {
   useEffect(() => {
     if (mode !== 'ai' || gameStarted) return
     const aiFirst = Math.random() < 0.5
-    // If AI first → AI is X (goes first), player is O
-    // If player first → player is X, AI is O
     setMySymbol(aiFirst ? 'O' : 'X')
-    setTimeout(() => setCoinWinner(aiFirst ? 'AI' : playerName), 300)
+    setTimeout(() => setCoinWinner(aiFirst ? 'AI' : 'คุณ'), 300)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // AI move — fires when it's NOT the player's turn
@@ -130,9 +133,8 @@ function TictactoePage() {
     if (w) {
       setWinner(w)
       if (w !== 'draw') {
-        setScores((s) => ({ ...s, [w]: (s[w as 'X' | 'O'] ?? 0) + 1 }))
-        if (w === mySymbol) sound.win()
-        else sound.lose()
+        if (w === mySymbol) { setScores((s) => ({ ...s, player: s.player + 1 })); sound.win() }
+        else { setScores((s) => ({ ...s, ai: s.ai + 1 })); sound.lose() }
       } else {
         sound.draw()
       }
@@ -171,7 +173,7 @@ function TictactoePage() {
     setGameStarted(false)
     const aiFirst = Math.random() < 0.5
     setMySymbol(aiFirst ? 'O' : 'X')
-    setTimeout(() => setCoinWinner(aiFirst ? 'AI' : playerName), 300)
+    setTimeout(() => setCoinWinner(aiFirst ? 'AI' : 'คุณ'), 300)
   }
 
   function handleRematch() {
@@ -191,7 +193,6 @@ function TictactoePage() {
 
   // ---- MULTIPLAYER PHASE RENDERING ----
   if (isMultiplayer) {
-    // Waiting room
     if (phase === 'waiting' && isHost) {
       return (
         <GameLayout title="โอ-ซี">
@@ -200,37 +201,26 @@ function TictactoePage() {
       )
     }
 
-    // Setup (both players present, choose color)
     if (phase === 'setup' || (phase === 'waiting' && !isHost)) {
       return (
         <GameLayout title="โอ-ซี">
           <SetupRoom
-            myInfo={myInfo ?? null}
-            opponentInfo={opponentInfo ?? null}
-            colorOptions={COLOR_OPTIONS}
-            selectedColor={selectedColor}
-            onSelectColor={setSelectedColor}
-            onReady={() => markReady(selectedColor)}
+            myInfo={myInfo ?? null} opponentInfo={opponentInfo ?? null}
+            colorOptions={COLOR_OPTIONS} selectedColor={selectedColor}
+            onSelectColor={setSelectedColor} onReady={() => markReady(selectedColor)}
           />
+          <ChatBox roomId={roomId} playerName={playerName} playerAvatar={avatarUrl} />
         </GameLayout>
       )
     }
 
-    // Coin flip phase
     if (phase === 'coin_flip') {
-      const firstPlayerName = roomTurn === 'host' ? (hostInfo?.name ?? '') : (guestInfo?.name ?? '')
+      const iGoFirst = roomTurn === (isHost ? 'host' : 'guest')
+      const fpName = iGoFirst ? 'คุณ' : (isHost ? guestInfo?.name : hostInfo?.name) ?? 'เพื่อน'
       return (
         <GameLayout title="โอ-ซี">
-          <CoinFlip
-            winner={firstPlayerName}
-            onDone={() => { setCoinWinner(null); setGameStarted(true) }}
-          />
-          {/* Show blank board behind */}
-          <div className="opacity-0 pointer-events-none grid grid-cols-3 gap-3 w-full max-w-xs mx-auto">
-            {Array(9).fill(null).map((_, i) => (
-              <div key={i} className="aspect-square" />
-            ))}
-          </div>
+          <CoinFlip winner={fpName} onDone={() => { setCoinWinner(null); setGameStarted(true) }} />
+          <ChatBox roomId={roomId} playerName={playerName} playerAvatar={avatarUrl} />
         </GameLayout>
       )
     }
@@ -256,7 +246,7 @@ function TictactoePage() {
           avatar={isMultiplayer ? hostInfo?.avatarUrl : avatarUrl}
           label={`ผู้เล่น (${isMultiplayer ? (isHost ? mySymbol : aiSymbol) : mySymbol})`}
           active={isMultiplayer ? roomTurn === 'host' && !winner : currentTurn === mySymbol && !winner}
-          score={isMultiplayer ? hostInfo?.score : scores[mySymbol]}
+          score={isMultiplayer ? hostInfo?.score : scores.player}
         />
       }
       topRight={
@@ -266,7 +256,7 @@ function TictactoePage() {
             avatar={isMultiplayer ? guestInfo?.avatarUrl : undefined}
             label={`ฝ่ายตรงข้าม (${isMultiplayer ? (isHost ? aiSymbol : mySymbol) : aiSymbol})`}
             active={isMultiplayer ? roomTurn === 'guest' && !winner : currentTurn !== mySymbol && !winner}
-            score={isMultiplayer ? guestInfo?.score : scores[aiSymbol]}
+            score={isMultiplayer ? guestInfo?.score : scores.ai}
             flip
           />
           {isMultiplayer && roomId && <RoomCode code={roomId} />}
