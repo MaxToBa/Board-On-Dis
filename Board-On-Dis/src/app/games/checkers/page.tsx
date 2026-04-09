@@ -13,7 +13,7 @@ import AiGameResult from '@/components/game/AiGameResult'
 import Confetti from '@/components/ui/Confetti'
 import { usePlayerInfo } from '@/hooks/usePlayerInfo'
 import { useMultiplayerRoom } from '@/hooks/useMultiplayerRoom'
-import { initialBoard, getValidMoves, applyMove, checkWinner } from '@/lib/games/checkers'
+import { initialBoard, getValidMoves, getChainJumps, applyMove, checkWinner } from '@/lib/games/checkers'
 import { sound } from '@/lib/sound'
 import { saveGameResult } from '@/lib/saveGameResult'
 import { COLOR_OPTIONS } from '@/types/room'
@@ -31,6 +31,7 @@ function CheckersPage() {
   const [gameStarted, setGameStarted] = useState(false)
   const [aiThinking, setAiThinking] = useState(false)
   const [selectedColor, setSelectedColor] = useState('red')
+  const [chainJump, setChainJump] = useState<[number, number] | null>(null)
 
   const isMultiplayer = mode === 'multiplayer' && !!roomId
   const isFlipped = myPlayer === 2
@@ -95,11 +96,27 @@ function CheckersPage() {
 
   function applyMoveAndUpdate(mv: Move) {
     const newBoard = applyMove(board, mv)
-    const w = checkWinner(newBoard)
     setBoard(newBoard)
     setSelected(null)
-    setValidMoves([])
     sound.capture()
+
+    // Chain jump: if this was a capture, check for follow-up jumps
+    if (mv.captures.length > 0) {
+      const chains = getChainJumps(newBoard, mv.to, currentTurn)
+      if (chains.length > 0) {
+        setChainJump(mv.to)
+        setSelected(mv.to)
+        setValidMoves(chains)
+        if (isMultiplayer) {
+          updateGameData({ board: newBoard, currentGameTurn: currentTurn, currentTurn: isHost ? 'host' : 'guest' })
+        }
+        return
+      }
+    }
+
+    setChainJump(null)
+    setValidMoves([])
+    const w = checkWinner(newBoard)
     if (w) {
       setWinner(w)
       if (w === myPlayer) sound.win(); else sound.lose()
@@ -123,6 +140,14 @@ function CheckersPage() {
     if (isMultiplayer && !isMyRoomTurn) return
     if (!isMultiplayer && mode === 'ai' && currentTurn !== myPlayer) return
     if (winner) return
+
+    // During chain jump: only allow clicking valid chain targets
+    if (chainJump) {
+      const mv = validMoves.find((m) => m.to[0] === r && m.to[1] === c)
+      if (mv) { applyMoveAndUpdate(mv); return }
+      return
+    }
+
     const piece = board[r][c]
 
     if (selected) {
@@ -150,6 +175,7 @@ function CheckersPage() {
   }
 
   function handleRematch() {
+    setChainJump(null)
     requestRematch({ board: initialBoard(), currentGameTurn: 1, currentTurn: 'host' })
   }
 
@@ -277,7 +303,7 @@ function CheckersPage() {
           aiName={opponentName}
           onRestart={() => {
             const aiFirst = Math.random() < 0.5
-            setBoard(initialBoard()); setWinner(null); setCurrentTurn(aiFirst ? 2 : 1); setSelected(null); setValidMoves([]); setGameStarted(false)
+            setBoard(initialBoard()); setWinner(null); setCurrentTurn(aiFirst ? 2 : 1); setSelected(null); setValidMoves([]); setChainJump(null); setGameStarted(false)
             setTimeout(() => setCoinWinner(aiFirst ? 'AI' : 'คุณ'), 300)
           }}
         />

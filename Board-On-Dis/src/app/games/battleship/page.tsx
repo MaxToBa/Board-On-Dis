@@ -520,14 +520,9 @@ function BattleshipPage() {
   }
 
   // ── BATTLE PHASE ──
-  const myShipsSunk   = myShips.filter(s=>s.positions.every(([r,c])=>myGrid[r][c]==='sunk'||myGrid[r][c]==='hit')).length
-  const enemyShipsSunk = enemyShips.filter(s=>s.positions.every(([r,c])=>enemyGrid[r][c]==='sunk'||enemyGrid[r][c]==='hit')).length
-
-  // Estimate enemy sunk from grid for multiplayer (no ship array available)
-  const enemySunkCount = isMultiplayer
-    ? Array.from({length:10}).reduce<number>((acc,_,r)=>
-        acc + Array.from({length:10}).filter((_,c)=>enemyGrid[r][c]==='sunk').length, 0)
-    : enemyShipsSunk
+  const myShipsSunk    = myShips.filter(s => s.hits >= s.size).length
+  const enemyShipsSunk = enemyShips.filter(s => s.hits >= s.size).length
+  const totalShips = isMultiplayer ? 5 : enemyShips.length
 
   return (
     <GameLayout
@@ -559,11 +554,11 @@ function BattleshipPage() {
       <div className="flex gap-4 mb-4">
         <div className="flex items-center gap-2 bg-surface border border-white/10 rounded-xl px-4 py-2">
           <span className="text-xs text-muted">เรือของคุณ</span>
-          <span className="text-sm font-bold text-white">{myShips.length-myShipsSunk} / {myShips.length}</span>
+          <span className="text-sm font-bold text-white">{myShips.length - myShipsSunk} / {myShips.length}</span>
         </div>
         <div className="flex items-center gap-2 bg-surface border border-white/10 rounded-xl px-4 py-2">
           <span className="text-xs text-muted">เรือศัตรู</span>
-          <span className="text-sm font-bold text-accent">{(isMultiplayer?5:enemyShips.length)-enemySunkCount} / {isMultiplayer?5:enemyShips.length}</span>
+          <span className="text-sm font-bold text-accent">{totalShips - enemyShipsSunk} / {totalShips}</span>
         </div>
       </div>
 

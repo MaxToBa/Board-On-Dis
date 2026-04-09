@@ -67,3 +67,21 @@ export function checkWinner(board: Board): 1 | 2 | null {
   if (p2 === 0) return 1
   return null
 }
+
+export function getChainJumps(board: Board, from: [number, number], player: 1 | 2): Move[] {
+  const [r, c] = from
+  const p = board[r][c]
+  if (!p) return []
+  const dirs = p.king
+    ? [[-1,-1],[-1,1],[1,-1],[1,1]]
+    : player === 1 ? [[-1,-1],[-1,1]] : [[1,-1],[1,1]]
+  const jumps: Move[] = []
+  for (const [dr, dc] of dirs) {
+    const mr = r + dr, mc = c + dc
+    const lr = r + dr * 2, lc = c + dc * 2
+    if (inBounds(lr, lc) && board[mr]?.[mc]?.player === (player === 1 ? 2 : 1) && !board[lr][lc]) {
+      jumps.push({ from: [r, c], to: [lr, lc], captures: [[mr, mc]] })
+    }
+  }
+  return jumps
+}
