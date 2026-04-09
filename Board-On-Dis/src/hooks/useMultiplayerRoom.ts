@@ -30,6 +30,7 @@ interface UseMultiplayerRoomReturn {
   connected: boolean
 
   markReady: (color: string) => Promise<void>
+  markUnready: () => Promise<void>
   updateGameData: (data: Record<string, unknown>) => Promise<void>
   finishGame: (winner: 'host' | 'guest' | 'draw') => Promise<void>
   requestRematch: (resetData: Record<string, unknown>) => Promise<void>
@@ -254,6 +255,26 @@ export function useMultiplayerRoom({
     return () => clearTimeout(timer)
   }, [roomState?.phase, isHost, pushState])
 
+  const markUnready = useCallback(async () => {
+    if (!roomIdRef.current) return
+    const { data } = await supabase.from('rooms').select('state').eq('id', roomIdRef.current).single()
+    const current = (data?.state as RoomState) ?? roomStateRef.current
+    if (!current) return
+
+    let updated: RoomState
+    if (isHost) {
+      updated = { ...current, host: { ...current.host, ready: false } }
+    } else if (current.players) {
+      const myIdx = current.players.findIndex((p) => p.userId === userId || p.name === playerName)
+      const newPlayers = current.players.map((p, i) => i === myIdx ? { ...p, ready: false } : p)
+      updated = { ...current, players: newPlayers }
+    } else {
+      updated = { ...current, guest: current.guest ? { ...current.guest, ready: false } : current.guest }
+    }
+
+    await pushState(updated)
+  }, [isHost, userId, playerName, pushState]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const markReady = useCallback(async (color: string) => {
     if (!roomIdRef.current) return
     const { data } = await supabase.from('rooms').select('state').eq('id', roomIdRef.current).single()
@@ -385,6 +406,7 @@ export function useMultiplayerRoom({
     rematchVotes,
     connected,
     markReady,
+    markUnready,
     updateGameData,
     finishGame,
     requestRematch,

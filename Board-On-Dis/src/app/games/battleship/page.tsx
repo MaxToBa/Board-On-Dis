@@ -147,7 +147,7 @@ function BattleshipPage() {
     phase, hostInfo, guestInfo, myInfo, opponentInfo,
     currentTurn: roomTurn, winner: roomWinner,
     rematchVotes,
-    markReady, updateGameData, finishGame, requestRematch,
+    markReady, markUnready, updateGameData, finishGame, requestRematch,
   } = useMultiplayerRoom({
     roomId: isMultiplayer ? roomId : '',
     isHost,
@@ -384,7 +384,7 @@ function BattleshipPage() {
           <SetupRoom
             myInfo={myInfo??null} opponentInfo={opponentInfo??null}
             colorOptions={COLOR_OPTIONS} selectedColor={selectedColor}
-            onSelectColor={setSelectedColor} onReady={()=>markReady(selectedColor)}
+            onSelectColor={setSelectedColor} onReady={()=>markReady(selectedColor)} onUnready={markUnready}
             showColorPicker={false}
           />
           <ChatBox roomId={roomId} playerName={playerName} playerAvatar={avatarUrl}/>
@@ -452,8 +452,13 @@ function BattleshipPage() {
             </div>
 
             <div className="flex gap-3 justify-center">
-              <button onClick={randomizeMyShips}
-                className="px-4 py-2 bg-surface2 border border-white/10 rounded-xl text-sm font-bold hover:border-white/25 transition-all">
+              <button onClick={()=>{ setMyPlacedShips([]); setSelectedShipIdx(null); setHoverCells([]) }}
+                disabled={myPlacedShips.length===0||myShipReady}
+                className="px-4 py-2 bg-surface2 border border-white/10 rounded-xl text-sm font-bold hover:border-white/25 transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+                🗑 ล้าง
+              </button>
+              <button onClick={randomizeMyShips} disabled={myShipReady}
+                className="px-4 py-2 bg-surface2 border border-white/10 rounded-xl text-sm font-bold hover:border-white/25 transition-all disabled:opacity-30 disabled:cursor-not-allowed">
                 🎲 สุ่มวาง
               </button>
               <button onClick={confirmShipPlacement} disabled={myPlacedShips.length<5||myShipReady}
@@ -509,6 +514,11 @@ function BattleshipPage() {
               />
             </div>
             <div className="flex gap-3 justify-center">
+              <button onClick={()=>{ setMyPlacedShips([]); setSelectedShipIdx(null); setHoverCells([]) }}
+                disabled={myPlacedShips.length===0}
+                className="px-4 py-2 bg-surface2 border border-white/10 rounded-xl text-sm font-bold hover:border-white/25 disabled:opacity-30 disabled:cursor-not-allowed">
+                🗑 ล้าง
+              </button>
               <button onClick={randomizeMyShips}
                 className="px-4 py-2 bg-surface2 border border-white/10 rounded-xl text-sm font-bold hover:border-white/25">
                 🎲 สุ่มวาง

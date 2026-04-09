@@ -37,7 +37,7 @@ function ConnectFourPage() {
     phase, hostInfo, guestInfo, myInfo, opponentInfo,
     firstTurn, currentTurn: roomTurn, winner: roomWinner,
     rematchVotes, isMyTurn: isMyRoomTurn, myPlayerNum,
-    markReady, updateGameData, finishGame, requestRematch,
+    markReady, markUnready, updateGameData, finishGame, requestRematch,
   } = useMultiplayerRoom({
     roomId: isMultiplayer ? roomId : '',
     isHost,
@@ -157,7 +157,7 @@ function ConnectFourPage() {
           <SetupRoom
             myInfo={myInfo ?? null} opponentInfo={opponentInfo ?? null}
             colorOptions={COLOR_OPTIONS} selectedColor={selectedColor}
-            onSelectColor={setSelectedColor} onReady={() => markReady(selectedColor)}
+            onSelectColor={setSelectedColor} onReady={() => markReady(selectedColor)} onUnready={markUnready}
           />
           <ChatBox roomId={roomId} playerName={playerName} playerAvatar={avatarUrl} />
         </GameLayout>

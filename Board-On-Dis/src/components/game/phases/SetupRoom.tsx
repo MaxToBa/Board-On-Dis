@@ -10,6 +10,7 @@ interface SetupRoomProps {
   selectedColor: string
   onSelectColor: (color: string) => void
   onReady: () => void
+  onUnready?: () => void
   showColorPicker?: boolean   // default true — set false for games that don't use piece colors
 }
 
@@ -20,6 +21,7 @@ export default function SetupRoom({
   selectedColor,
   onSelectColor,
   onReady,
+  onUnready,
   showColorPicker = true,
 }: SetupRoomProps) {
   const iAmReady = myInfo?.ready ?? false
@@ -50,8 +52,8 @@ export default function SetupRoom({
           </div>
           <div className="font-bold text-sm text-white truncate">{myInfo?.name}</div>
           <div className="text-xs text-muted mt-0.5">คุณ</div>
-          {showColorPicker && myInfo?.colorBg && (
-            <div className="w-5 h-5 rounded-full mx-auto mt-2 border border-white/20" style={{ background: myInfo.colorBg }} />
+          {showColorPicker && (
+            <div className="w-5 h-5 rounded-full mx-auto mt-2 border border-white/20" style={{ background: iAmReady ? (myInfo?.colorBg ?? selectedBg) : selectedBg }} />
           )}
           {iAmReady && (
             <div className="mt-2 text-xs font-bold" style={{ color: '#4fcf8e' }}>✓ Ready!</div>
@@ -153,14 +155,28 @@ export default function SetupRoom({
         </div>
       )}
 
-      {/* Ready button */}
-      <button
-        onClick={onReady}
-        disabled={!opponentInfo || iAmReady}
-        className="w-full py-4 bg-accent text-bg rounded-2xl font-bold text-lg hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        {iAmReady ? '✓ รอเพื่อน...' : !opponentInfo ? 'รอเพื่อนเข้าห้อง...' : '🎮 Ready!'}
-      </button>
+      {/* Ready / Unready buttons */}
+      {iAmReady && onUnready ? (
+        <div className="flex gap-3">
+          <button
+            onClick={onUnready}
+            className="flex-1 py-4 bg-surface2 border border-white/15 text-muted rounded-2xl font-bold text-lg hover:border-white/30 transition-all"
+          >
+            ✕ ยกเลิก
+          </button>
+          <div className="flex-1 py-4 bg-green/10 border border-green/30 text-green rounded-2xl font-bold text-lg text-center">
+            ✓ รอเพื่อน...
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={onReady}
+          disabled={!opponentInfo || iAmReady}
+          className="w-full py-4 bg-accent text-bg rounded-2xl font-bold text-lg hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {iAmReady ? '✓ รอเพื่อน...' : !opponentInfo ? 'รอเพื่อนเข้าห้อง...' : '🎮 Ready!'}
+        </button>
+      )}
     </div>
   )
 }

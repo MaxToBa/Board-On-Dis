@@ -77,7 +77,7 @@ function UnoPage() {
     currentTurn: roomTurn, winner: roomWinner,
     rematchVotes, isMyTurn: isMyRoomTurn,
     myPlayerIndex,
-    markReady, updateGameData, finishGame, requestRematch,
+    markReady, markUnready, updateGameData, finishGame, requestRematch,
   } = useMultiplayerRoom({
     roomId: isMultiplayer ? roomId : '',
     isHost,
@@ -422,7 +422,7 @@ function UnoPage() {
           <SetupRoom
             myInfo={myInfo ?? null} opponentInfo={opponentInfo ?? null}
             colorOptions={COLOR_OPTIONS} selectedColor={selectedColor}
-            onSelectColor={setSelectedColor} onReady={() => markReady(selectedColor)}
+            onSelectColor={setSelectedColor} onReady={() => markReady(selectedColor)} onUnready={markUnready}
             showColorPicker={false}
           />
           <ChatBox roomId={roomId} playerName={playerName} playerAvatar={avatarUrl}/>
