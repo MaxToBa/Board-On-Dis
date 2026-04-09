@@ -34,15 +34,26 @@ export default function ChatBox({ roomId, playerName, playerAvatar }: ChatBoxPro
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` },
         (payload: { new: Message }) => {
           const msg = payload.new
+          if (msg.player_name === playerName) {
+            // Replace the optimistic message with the real one from DB
+            setMessages((prev) => {
+              const idx = prev.findLastIndex((m) => m.id.startsWith('_tmp_') && m.message === msg.message)
+              if (idx >= 0) {
+                const updated = [...prev]
+                updated[idx] = msg
+                return updated
+              }
+              return [...prev, msg]
+            })
+            return
+          }
           setMessages((prev) => [...prev, msg])
-          if (msg.player_name !== playerName) {
-            sound.chat()
-            if (!openRef.current) {
-              setUnread((u) => u + 1)
-              setPopup(msg)
-              clearTimeout(popupTimer.current)
-              popupTimer.current = setTimeout(() => setPopup(null), 4000)
-            }
+          sound.chat()
+          if (!openRef.current) {
+            setUnread((u) => u + 1)
+            setPopup(msg)
+            clearTimeout(popupTimer.current)
+            popupTimer.current = setTimeout(() => setPopup(null), 4000)
           }
         })
       .subscribe()
@@ -58,6 +69,16 @@ export default function ChatBox({ roomId, playerName, playerAvatar }: ChatBoxPro
     const msg = input.trim()
     if (!msg) return
     setInput('')
+    // Optimistic update so sender sees message immediately
+    const tmpMsg: Message = {
+      id: `_tmp_${Date.now()}`,
+      room_id: roomId,
+      player_name: playerName,
+      player_avatar: playerAvatar ?? null,
+      message: msg,
+      created_at: new Date().toISOString(),
+    }
+    setMessages((prev) => [...prev, tmpMsg])
     await supabase.from('messages').insert({
       room_id: roomId,
       player_name: playerName,

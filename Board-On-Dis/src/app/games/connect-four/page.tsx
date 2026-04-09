@@ -61,6 +61,11 @@ function ConnectFourPage() {
     setCoinWinner(iGoFirst ? 'คุณ' : (isHost ? guestInfo.name : hostInfo.name))
   }, [phase, isMultiplayer, roomTurn]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!isMultiplayer || phase === 'coin_flip') return
+    setCoinWinner(null)
+  }, [phase, isMultiplayer])
+
   // AI mode: coin flip
   useEffect(() => {
     if (mode !== 'ai' || gameStarted) return

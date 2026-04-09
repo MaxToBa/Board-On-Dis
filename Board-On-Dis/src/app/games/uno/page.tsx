@@ -86,8 +86,8 @@ function UnoPage() {
     userId,
     onGameStateChange: useCallback((state: Record<string, unknown>) => {
       if (!isMultiplayer) return
-      // Use player index to find my hand key (supports 2-4 players)
-      const myIdx = (state.myPlayerIndex as number | undefined) ?? (isHost ? 0 : 1)
+      // myIdx must be based on who I am, not on state.myPlayerIndex (which is always 0, written by host)
+      const myIdx = isHost ? 0 : 1
       const myHandKey = HAND_KEYS[myIdx] ?? 'hostHand'
 
       if (state[myHandKey]) setHand(state[myHandKey] as Card[])
@@ -128,6 +128,11 @@ function UnoPage() {
     const iGoFirst = roomTurn === (isHost ? 'host' : 'guest')
     setCoinWinner(iGoFirst ? 'คุณ' : (isHost ? guestInfo.name : hostInfo.name))
   }, [phase, isMultiplayer, roomTurn]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!isMultiplayer || phase === 'coin_flip') return
+    setCoinWinner(null)
+  }, [phase, isMultiplayer])
 
   // ── When playing phase starts: host deals cards ──
   useEffect(() => {

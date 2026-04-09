@@ -76,6 +76,12 @@ function TictactoePage() {
     setCoinWinner(iGoFirst ? 'คุณ' : (isHost ? guestInfo.name : hostInfo.name))
   }, [phase, isMultiplayer, roomTurn]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Clear coinWinner when phase leaves coin_flip — prevents overlay showing twice
+  useEffect(() => {
+    if (!isMultiplayer || phase === 'coin_flip') return
+    setCoinWinner(null)
+  }, [phase, isMultiplayer])
+
   // When phase moves to playing (after coin flip), start game
   useEffect(() => {
     if (!isMultiplayer || phase !== 'playing') return

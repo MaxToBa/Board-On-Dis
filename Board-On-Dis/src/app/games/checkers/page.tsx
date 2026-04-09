@@ -71,6 +71,11 @@ function CheckersPage() {
   }, [phase, isMultiplayer, roomTurn]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    if (!isMultiplayer || phase === 'coin_flip') return
+    setCoinWinner(null)
+  }, [phase, isMultiplayer])
+
+  useEffect(() => {
     if (mode !== 'ai' || gameStarted) return
     const aiFirst = Math.random() < 0.5
     setMyPlayer(1)
