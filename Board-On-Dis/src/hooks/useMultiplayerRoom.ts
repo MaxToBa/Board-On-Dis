@@ -160,6 +160,8 @@ export function useMultiplayerRoom({
       { color: 'amber',  colorBg: '#e8c547' },
       { color: 'green',  colorBg: '#4fcf8e' },
       { color: 'pink',   colorBg: '#ec4899' },
+      { color: 'blue',   colorBg: '#3b82f6' },
+      { color: 'white',  colorBg: '#f0ede8' },
     ]
 
     const newPlayer: PlayerInRoom = {
@@ -180,7 +182,7 @@ export function useMultiplayerRoom({
       // Slots 2-3: join as extra player
       const existing = currentState.players ?? [currentState.host, currentState.guest]
       const slotIndex = existing.length  // 2 = 3rd player, 3 = 4th player
-      if (slotIndex >= 4) return         // max 4 players
+      if (slotIndex >= 6) return         // max 6 players
       const colorSlot = EXTRA_COLORS[slotIndex - 2] ?? EXTRA_COLORS[0]
       newPlayer.color = colorSlot.color
       newPlayer.colorBg = colorSlot.colorBg
