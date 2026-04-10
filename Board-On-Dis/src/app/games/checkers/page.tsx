@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { motion } from 'framer-motion'
 import GameLayout from '@/components/game/GameLayout'
 import PlayerCard from '@/components/game/PlayerCard'
@@ -31,7 +31,13 @@ function CheckersPage() {
   const [gameStarted, setGameStarted] = useState(false)
   const [aiThinking, setAiThinking] = useState(false)
   const [selectedColor, setSelectedColor] = useState('red')
-  const [chainJump, setChainJump] = useState<[number, number] | null>(null)
+  const [chainJump, setChainJumpInner] = useState<[number, number] | null>(null)
+  const chainJumpRef = useRef<[number, number] | null>(null)
+
+  function setChainJumpState(pos: [number, number] | null) {
+    chainJumpRef.current = pos
+    setChainJumpInner(pos)
+  }
 
   const isMultiplayer = mode === 'multiplayer' && !!roomId
   const isFlipped = myPlayer === 2
@@ -52,8 +58,12 @@ function CheckersPage() {
         setBoard(state.board as Board)
         setGameStarted(true)
         setWinner(null)
-        setSelected(null)
-        setValidMoves([])
+        // Don't reset selection during an active chain jump — the echo from
+        // our own updateGameData would wipe out the chain jump state
+        if (!chainJumpRef.current) {
+          setSelected(null)
+          setValidMoves([])
+        }
       }
       if (state.currentGameTurn) setCurrentTurn(state.currentGameTurn as 1 | 2)
     }, []),
@@ -109,7 +119,7 @@ function CheckersPage() {
     if (mv.captures.length > 0) {
       const chains = getChainJumps(newBoard, mv.to, currentTurn)
       if (chains.length > 0) {
-        setChainJump(mv.to)
+        setChainJumpState(mv.to)
         setSelected(mv.to)
         setValidMoves(chains)
         if (isMultiplayer) {
@@ -119,7 +129,7 @@ function CheckersPage() {
       }
     }
 
-    setChainJump(null)
+    setChainJumpState(null)
     setValidMoves([])
     const w = checkWinner(newBoard)
     if (w) {
@@ -180,7 +190,7 @@ function CheckersPage() {
   }
 
   function handleRematch() {
-    setChainJump(null)
+    setChainJumpState(null)
     requestRematch({ board: initialBoard(), currentGameTurn: 1, currentTurn: 'host' })
   }
 
@@ -308,7 +318,7 @@ function CheckersPage() {
           aiName={opponentName}
           onRestart={() => {
             const aiFirst = Math.random() < 0.5
-            setBoard(initialBoard()); setWinner(null); setCurrentTurn(aiFirst ? 2 : 1); setSelected(null); setValidMoves([]); setChainJump(null); setGameStarted(false)
+            setBoard(initialBoard()); setWinner(null); setCurrentTurn(aiFirst ? 2 : 1); setSelected(null); setValidMoves([]); setChainJumpState(null); setGameStarted(false)
             setTimeout(() => setCoinWinner(aiFirst ? 'AI' : 'คุณ'), 300)
           }}
         />
