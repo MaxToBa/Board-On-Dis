@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import Avatar from '@/components/ui/Avatar'
 import { sound } from '@/lib/sound'
@@ -22,44 +22,76 @@ export default function ChatBox({ roomId, playerName, playerAvatar }: ChatBoxPro
   const openRef = useRef(open)
   useEffect(() => { openRef.current = open }, [open])
 
+  const seenIds = useRef<Set<string>>(new Set())
+  const lastFetchedAt = useRef<string | null>(null)
+
+  // Handle a batch of new messages from realtime or polling
+  const handleNewMessages = useCallback((incoming: Message[]) => {
+    if (!incoming.length) return
+    const fresh = incoming.filter((m) => !seenIds.current.has(m.id))
+    if (!fresh.length) return
+
+    fresh.forEach((m) => seenIds.current.add(m.id))
+    lastFetchedAt.current = fresh[fresh.length - 1].created_at
+
+    setMessages((prev) => {
+      let next = [...prev]
+      for (const msg of fresh) {
+        // Replace matching optimistic message from sender
+        const tmpIdx = next.findLastIndex((m) => m.id.startsWith('_tmp_') && m.message === msg.message && m.player_name === msg.player_name)
+        if (tmpIdx >= 0) { next[tmpIdx] = msg; continue }
+        next = [...next, msg]
+      }
+      return next
+    })
+
+    // Side-effects for messages from others
+    const fromOthers = fresh.filter((m) => m.player_name !== playerName)
+    if (fromOthers.length) {
+      sound.chat()
+      if (!openRef.current) {
+        const last = fromOthers[fromOthers.length - 1]
+        setUnread((u) => u + fromOthers.length)
+        setPopup(last)
+        clearTimeout(popupTimer.current)
+        popupTimer.current = setTimeout(() => setPopup(null), 4000)
+      }
+    }
+  }, [playerName]) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!roomId) return
+    seenIds.current = new Set()
+    lastFetchedAt.current = null
 
     // Load existing messages
     supabase.from('messages').select('*').eq('room_id', roomId).order('created_at')
-      .then(({ data }: { data: Message[] | null }) => { if (data) setMessages(data) })
+      .then(({ data }: { data: Message[] | null }) => {
+        if (data && data.length) {
+          data.forEach((m) => seenIds.current.add(m.id))
+          lastFetchedAt.current = data[data.length - 1].created_at
+          setMessages(data)
+        }
+      })
 
+    // Realtime subscription (best-effort — may not fire if table realtime is disabled)
     const channel = supabase
       .channel(`chat-${roomId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` },
-        (payload: { new: Message }) => {
-          const msg = payload.new
-          if (msg.player_name === playerName) {
-            // Replace the optimistic message with the real one from DB
-            setMessages((prev) => {
-              const idx = prev.findLastIndex((m) => m.id.startsWith('_tmp_') && m.message === msg.message)
-              if (idx >= 0) {
-                const updated = [...prev]
-                updated[idx] = msg
-                return updated
-              }
-              return [...prev, msg]
-            })
-            return
-          }
-          setMessages((prev) => [...prev, msg])
-          sound.chat()
-          if (!openRef.current) {
-            setUnread((u) => u + 1)
-            setPopup(msg)
-            clearTimeout(popupTimer.current)
-            popupTimer.current = setTimeout(() => setPopup(null), 4000)
-          }
-        })
+        (payload: { new: Message }) => { handleNewMessages([payload.new]) })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
-  }, [roomId, playerName])
+    // Polling fallback every 3s — guarantees delivery regardless of realtime status
+    const poll = setInterval(async () => {
+      const { data } = await supabase
+        .from('messages').select('*').eq('room_id', roomId)
+        .gt('created_at', lastFetchedAt.current ?? new Date(0).toISOString())
+        .order('created_at')
+      if (data && data.length) handleNewMessages(data as Message[])
+    }, 3000)
+
+    return () => { supabase.removeChannel(channel); clearInterval(poll) }
+  }, [roomId, handleNewMessages])
 
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -70,8 +102,9 @@ export default function ChatBox({ roomId, playerName, playerAvatar }: ChatBoxPro
     if (!msg) return
     setInput('')
     // Optimistic update so sender sees message immediately
+    const tmpId = `_tmp_${Date.now()}`
     const tmpMsg: Message = {
-      id: `_tmp_${Date.now()}`,
+      id: tmpId,
       room_id: roomId,
       player_name: playerName,
       player_avatar: playerAvatar ?? null,

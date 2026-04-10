@@ -235,8 +235,7 @@ function UnoPage() {
   }
 
   function playCard(card: Card) {
-    if (!myTurn || !gameStarted) return
-    if (isMultiplayer && !isMyUnoTurn) return
+    if (isMultiplayer ? (!isMyUnoTurn || !gameStarted) : (!myTurn || !gameStarted)) return
     const topCard = discard[discard.length - 1]
     if (!canPlay(card, topCard, activeColor)) return
     sound.cardPlay()
@@ -522,7 +521,7 @@ function UnoPage() {
 
       {/* Discard + Deck */}
       <div className="flex gap-6 items-center mb-5">
-        <button onClick={drawFromDeck} disabled={!myTurn || !gameStarted}
+        <button onClick={drawFromDeck} disabled={!(isMultiplayer ? isMyUnoTurn : myTurn) || !gameStarted}
           className="flex flex-col items-center gap-1 group">
           <div className="w-16 h-24 rounded-xl bg-gradient-to-br from-purple/60 to-purple/30 border-2 border-purple/40 flex items-center justify-center group-hover:border-purple/60 transition-colors shadow-lg">
             <span className="text-2xl font-black text-white/60 text-sm italic">UNO</span>
@@ -543,10 +542,10 @@ function UnoPage() {
           const canPlayCard = playable.some(c => c.id === card.id)
           return (
             <motion.button key={card.id}
-              whileHover={canPlayCard && myTurn ? { y: -10, scale: 1.08 } : {}}
+              whileHover={canPlayCard && isMyUnoTurn ? { y: -10, scale: 1.08 } : {}}
               onClick={() => playCard(card)}
               className={`w-14 h-20 rounded-xl border-2 flex flex-col items-center justify-center font-bold transition-all shadow-md ${COLOR_BG[card.color]} ${
-                canPlayCard && myTurn ? 'cursor-pointer shadow-lg ring-2 ring-white/30' : 'opacity-50 cursor-default'}`}>
+                canPlayCard && isMyUnoTurn ? 'cursor-pointer shadow-lg ring-2 ring-white/30' : 'opacity-50 cursor-default'}`}>
               <span className="text-2xl font-black">{cardDisplay(card)}</span>
             </motion.button>
           )
@@ -603,7 +602,8 @@ function UnoPage() {
         />
       )}
 
-      <CoinFlip winner={coinWinner} onDone={() => { setCoinWinner(null); setGameStarted(!isMultiplayer) }}/>
+      {/* CoinFlip only for AI mode — multiplayer coin flip uses the phase early-return above */}
+      {mode === 'ai' && <CoinFlip winner={coinWinner} onDone={() => { setCoinWinner(null); setGameStarted(true) }}/>}
       {isMultiplayer && roomId && <ChatBox roomId={roomId} playerName={playerName} playerAvatar={avatarUrl}/>}
     </GameLayout>
   )

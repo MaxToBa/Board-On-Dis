@@ -153,6 +153,8 @@ export function useMultiplayerRoom({
 
   async function joinAsGuest(currentState: RoomState) {
     if (!roomIdRef.current) return
+    // Don't allow joining after the game has started
+    if (currentState.phase !== 'waiting' && currentState.phase !== 'setup') return
 
     const EXTRA_COLORS = [
       { color: 'amber',  colorBg: '#e8c547' },
