@@ -18,6 +18,7 @@ interface GameModalProps {
 
 const SOLO_ONLY: GameType[] = ['2048']
 const COMING_SOON: GameType[] = ['chess']
+const MULTI_PLAYER_GAMES: GameType[] = ['uno']  // games that support 3-6 players
 
 type Difficulty = 'easy' | 'medium' | 'hard'
 
@@ -84,7 +85,15 @@ export default function GameModal({ game, onClose }: GameModalProps) {
         .eq('game', game.id)
         .single()
       if (error || !data) throw new Error('ไม่พบห้องนี้')
-      if (data.status !== 'waiting') throw new Error('ห้องนี้เริ่มเล่นไปแล้ว')
+      if (MULTI_PLAYER_GAMES.includes(game.id as GameType)) {
+        // Multi-player games: allow joining during 'waiting' or 'setup' phase
+        if (data.status !== 'waiting' && data.status !== 'setup') throw new Error('ห้องนี้เริ่มเล่นไปแล้ว')
+        const st = data.state as Record<string, unknown>
+        const filled = Array.isArray(st?.players) ? st.players.length : (st?.guest ? 2 : 1)
+        if (filled >= 6) throw new Error('ห้องเต็มแล้ว (6/6 คน)')
+      } else {
+        if (data.status !== 'waiting') throw new Error('ห้องนี้เริ่มเล่นไปแล้ว')
+      }
       router.push(`/games/${game.id}?room=${code}&name=${encodeURIComponent(playerName)}`)
       handleClose()
     } catch (err: unknown) {
