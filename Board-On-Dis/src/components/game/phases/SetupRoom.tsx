@@ -6,6 +6,7 @@ import type { PlayerInRoom, ColorOption } from '@/types/room'
 interface SetupRoomProps {
   myInfo: PlayerInRoom | null
   opponentInfo: PlayerInRoom | null
+  allPlayers?: PlayerInRoom[]   // when provided, show all players (3+ player games)
   colorOptions: ColorOption[]
   selectedColor: string
   onSelectColor: (color: string) => void
@@ -17,6 +18,7 @@ interface SetupRoomProps {
 export default function SetupRoom({
   myInfo,
   opponentInfo,
+  allPlayers,
   colorOptions,
   selectedColor,
   onSelectColor,
@@ -26,6 +28,7 @@ export default function SetupRoom({
 }: SetupRoomProps) {
   const iAmReady = myInfo?.ready ?? false
   const opponentReady = opponentInfo?.ready ?? false
+  const hasEnoughPlayers = allPlayers ? allPlayers.length >= 2 : !!opponentInfo
   const [showCustom, setShowCustom] = useState(false)
   const colorInputRef = useRef<HTMLInputElement>(null)
 
@@ -43,50 +46,78 @@ export default function SetupRoom({
         </p>
       </div>
 
-      {/* Both players */}
-      <div className="grid grid-cols-2 gap-4">
-        {/* Me */}
-        <div className={`bg-surface border rounded-2xl p-4 text-center transition-all ${iAmReady ? 'border-green/50' : 'border-accent/40'}`}>
-          <div className="flex justify-center mb-2">
-            <Avatar src={myInfo?.avatarUrl} name={myInfo?.name ?? ''} size="lg" />
-          </div>
-          <div className="font-bold text-sm text-white truncate">{myInfo?.name}</div>
-          <div className="text-xs text-muted mt-0.5">คุณ</div>
-          {showColorPicker && (
-            <div className="w-5 h-5 rounded-full mx-auto mt-2 border border-white/20" style={{ background: iAmReady ? (myInfo?.colorBg ?? selectedBg) : selectedBg }} />
-          )}
-          {iAmReady && (
-            <div className="mt-2 text-xs font-bold" style={{ color: '#4fcf8e' }}>✓ Ready!</div>
-          )}
-        </div>
-
-        {/* Opponent */}
-        <div className={`bg-surface border rounded-2xl p-4 text-center transition-all ${
-          opponentInfo
-            ? opponentReady ? 'border-green/50' : 'border-white/10'
-            : 'border-dashed border-white/15'
-        }`}>
-          {opponentInfo ? (
-            <>
-              <div className="flex justify-center mb-2">
-                <Avatar src={opponentInfo.avatarUrl} name={opponentInfo.name} size="lg" />
+      {/* Players grid */}
+      {allPlayers && allPlayers.length > 2 ? (
+        /* 3-6 player lobby: show all slots in a wrap grid */
+        <div className="grid grid-cols-3 gap-2">
+          {allPlayers.map((p, i) => {
+            const isMe = p.userId === myInfo?.userId || p.name === myInfo?.name
+            return (
+              <div key={i} className={`bg-surface border rounded-xl p-3 text-center transition-all ${
+                p.ready ? 'border-green/50' : isMe ? 'border-accent/40' : 'border-white/10'
+              }`}>
+                <div className="flex justify-center mb-1.5">
+                  <Avatar src={p.avatarUrl} name={p.name} size="sm" />
+                </div>
+                <div className="font-bold text-[11px] text-white truncate">{p.name}{isMe ? ' (คุณ)' : ''}</div>
+                {showColorPicker && p.colorBg && (
+                  <div className="w-4 h-4 rounded-full mx-auto mt-1.5 border border-white/20"
+                    style={{ background: isMe && !p.ready ? selectedBg : p.colorBg }} />
+                )}
+                {p.ready
+                  ? <div className="mt-1.5 text-[10px] font-bold" style={{ color: '#4fcf8e' }}>✓ Ready</div>
+                  : <div className="mt-1.5 text-[10px] text-muted">รอ...</div>
+                }
               </div>
-              <div className="font-bold text-sm text-white truncate">{opponentInfo.name}</div>
-              {showColorPicker && opponentInfo.colorBg && (
-                <div className="w-5 h-5 rounded-full mx-auto mt-2 border border-white/20" style={{ background: opponentInfo.colorBg }} />
-              )}
-              {opponentReady && (
-                <div className="mt-2 text-xs font-bold" style={{ color: '#4fcf8e' }}>✓ Ready!</div>
-              )}
-            </>
-          ) : (
-            <>
-              <div className="w-14 h-14 rounded-full bg-surface2 border-2 border-dashed border-white/20 mx-auto mb-2 flex items-center justify-center text-2xl text-muted">?</div>
-              <div className="text-muted text-sm">รอเพื่อน...</div>
-            </>
-          )}
+            )
+          })}
         </div>
-      </div>
+      ) : (
+        /* 2-player lobby */
+        <div className="grid grid-cols-2 gap-4">
+          {/* Me */}
+          <div className={`bg-surface border rounded-2xl p-4 text-center transition-all ${iAmReady ? 'border-green/50' : 'border-accent/40'}`}>
+            <div className="flex justify-center mb-2">
+              <Avatar src={myInfo?.avatarUrl} name={myInfo?.name ?? ''} size="lg" />
+            </div>
+            <div className="font-bold text-sm text-white truncate">{myInfo?.name}</div>
+            <div className="text-xs text-muted mt-0.5">คุณ</div>
+            {showColorPicker && (
+              <div className="w-5 h-5 rounded-full mx-auto mt-2 border border-white/20" style={{ background: iAmReady ? (myInfo?.colorBg ?? selectedBg) : selectedBg }} />
+            )}
+            {iAmReady && (
+              <div className="mt-2 text-xs font-bold" style={{ color: '#4fcf8e' }}>✓ Ready!</div>
+            )}
+          </div>
+
+          {/* Opponent */}
+          <div className={`bg-surface border rounded-2xl p-4 text-center transition-all ${
+            opponentInfo
+              ? opponentReady ? 'border-green/50' : 'border-white/10'
+              : 'border-dashed border-white/15'
+          }`}>
+            {opponentInfo ? (
+              <>
+                <div className="flex justify-center mb-2">
+                  <Avatar src={opponentInfo.avatarUrl} name={opponentInfo.name} size="lg" />
+                </div>
+                <div className="font-bold text-sm text-white truncate">{opponentInfo.name}</div>
+                {showColorPicker && opponentInfo.colorBg && (
+                  <div className="w-5 h-5 rounded-full mx-auto mt-2 border border-white/20" style={{ background: opponentInfo.colorBg }} />
+                )}
+                {opponentReady && (
+                  <div className="mt-2 text-xs font-bold" style={{ color: '#4fcf8e' }}>✓ Ready!</div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="w-14 h-14 rounded-full bg-surface2 border-2 border-dashed border-white/20 mx-auto mb-2 flex items-center justify-center text-2xl text-muted">?</div>
+                <div className="text-muted text-sm">รอเพื่อน...</div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Color picker — only shown when showColorPicker=true */}
       {showColorPicker && (
@@ -171,10 +202,10 @@ export default function SetupRoom({
       ) : (
         <button
           onClick={onReady}
-          disabled={!opponentInfo || iAmReady}
+          disabled={!hasEnoughPlayers || iAmReady}
           className="w-full py-4 bg-accent text-bg rounded-2xl font-bold text-lg hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {iAmReady ? '✓ รอเพื่อน...' : !opponentInfo ? 'รอเพื่อนเข้าห้อง...' : '🎮 Ready!'}
+          {iAmReady ? '✓ รอเพื่อน...' : !hasEnoughPlayers ? 'รอเพื่อนเข้าห้อง...' : '🎮 Ready!'}
         </button>
       )}
     </div>

@@ -102,7 +102,7 @@ function UnoPage() {
   const [allHands, setAllHands] = useState<(Card[] | null)[]>([null, null, null, null, null, null])
 
   const isMultiplayer = mode === 'multiplayer' && !!roomId
-  const myIdxRef = useRef(0)
+  const myIdxRef = useRef(isHost ? 0 : 1)
 
   const {
     phase, hostInfo, guestInfo, myInfo, opponentInfo,
@@ -150,7 +150,7 @@ function UnoPage() {
   useEffect(() => { myIdxRef.current = myPlayerIndex }, [myPlayerIndex])
 
   const isMyUnoTurn = isMultiplayer
-    ? (allPlayers.length <= 2 ? isMyRoomTurn : unoPlayerIndex === myPlayerIndex)
+    ? (gameStarted ? unoPlayerIndex === myPlayerIndex : isMyRoomTurn)
     : myTurn
 
   // ── Coin flip display ──
@@ -421,6 +421,7 @@ function UnoPage() {
         <GameLayout title="UNO">
           <SetupRoom
             myInfo={myInfo ?? null} opponentInfo={opponentInfo ?? null}
+            allPlayers={allPlayers.length > 2 ? allPlayers : undefined}
             colorOptions={COLOR_OPTIONS} selectedColor={selectedColor}
             onSelectColor={setSelectedColor} onReady={() => markReady(selectedColor)} onUnready={markUnready}
             showColorPicker={false}

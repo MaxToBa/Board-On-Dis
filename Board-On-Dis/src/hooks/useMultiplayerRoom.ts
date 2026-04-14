@@ -180,7 +180,10 @@ export function useMultiplayerRoom({
       newState = { ...currentState, phase: 'setup', guest: newPlayer }
     } else {
       // Slots 2-3: join as extra player
-      const existing = currentState.players ?? [currentState.host, currentState.guest]
+      // Always use live host/guest for indices 0 and 1 to avoid stale snapshots
+      const existing = currentState.players
+        ? [currentState.host, currentState.guest ?? currentState.players[1], ...currentState.players.slice(2)]
+        : [currentState.host, currentState.guest]
       const slotIndex = existing.length  // 2 = 3rd player, 3 = 4th player
       if (slotIndex >= 6) return         // max 6 players
       const colorSlot = EXTRA_COLORS[slotIndex - 2] ?? EXTRA_COLORS[0]
@@ -276,6 +279,18 @@ export function useMultiplayerRoom({
       updated = { ...current, guest: current.guest ? { ...current.guest, ready: false } : current.guest }
     }
 
+    // Keep players[] in sync with live host/guest fields
+    if (updated.players) {
+      updated = {
+        ...updated,
+        players: updated.players.map((p, i) => {
+          if (i === 0) return updated.host
+          if (i === 1) return updated.guest ?? p
+          return p
+        }),
+      }
+    }
+
     await pushState(updated)
   }, [isHost, userId, playerName, pushState]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -303,6 +318,18 @@ export function useMultiplayerRoom({
       updated = { ...current, players: newPlayers, guest: myIdx === 1 ? updatedPlayer : current.guest }
     } else {
       updated = { ...current, guest: updatedPlayer }
+    }
+
+    // Keep players[] in sync with live host/guest fields
+    if (updated.players) {
+      updated = {
+        ...updated,
+        players: updated.players.map((p, i) => {
+          if (i === 0) return updated.host
+          if (i === 1) return updated.guest ?? p
+          return p
+        }),
+      }
     }
 
     // Check if ALL players are ready
@@ -378,7 +405,8 @@ export function useMultiplayerRoom({
   const hostInfo = roomState?.host ?? null
   const guestInfo = roomState?.guest ?? null
   const allPlayers: PlayerInRoom[] = roomState?.players
-    ?? [hostInfo, ...(guestInfo ? [guestInfo] : [])].filter(Boolean) as PlayerInRoom[]
+    ? [roomState.host, ...(roomState.guest ? [roomState.guest] : []), ...roomState.players.slice(2)]
+    : [hostInfo, ...(guestInfo ? [guestInfo] : [])].filter(Boolean) as PlayerInRoom[]
   const myInfo = isHost ? hostInfo : (roomState?.players
     ? roomState.players.find((p) => p.userId === userId || p.name === playerName) ?? guestInfo
     : guestInfo)
