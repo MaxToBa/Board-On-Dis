@@ -55,12 +55,9 @@ export default function LoginPage() {
   function handleGuest() {
     const name = guestName.trim()
     if (!name) return toast('กรุณาใส่ชื่อ', 'error')
-    try {
-      sessionStorage.setItem('guestName', name)
-    } catch {
-      // sessionStorage unavailable (private browsing with strict settings) — fall back to cookie
-      document.cookie = `guestName=${encodeURIComponent(name)}; path=/`
-    }
+    // Cookie is read by middleware (server-side), sessionStorage by client components
+    document.cookie = `guestName=${encodeURIComponent(name)}; path=/`
+    try { sessionStorage.setItem('guestName', name) } catch { /* ignore */ }
     window.location.href = '/'
   }
 
