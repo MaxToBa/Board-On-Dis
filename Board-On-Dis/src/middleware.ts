@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -29,8 +29,9 @@ export async function proxy(request: NextRequest) {
   const { data: { session } } = await supabase.auth.getSession()
   const { pathname } = request.nextUrl
 
-  const isAuthPage = pathname.startsWith('/login')
+  // Always allow: static assets, API routes, auth flow, login page
   const isPublic =
+    pathname.startsWith('/login') ||
     pathname.startsWith('/api') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/auth') ||
@@ -38,11 +39,15 @@ export async function proxy(request: NextRequest) {
 
   if (isPublic) return response
 
-  if (!session && !isAuthPage) {
+  // Allow guests — they set a guestName cookie on the login page
+  const hasGuestCookie = !!request.cookies.get('guestName')?.value
+
+  if (!session && !hasGuestCookie) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if (session && isAuthPage) {
+  // Already logged in and trying to access login → go home
+  if (session && pathname.startsWith('/login')) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
