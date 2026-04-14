@@ -32,7 +32,7 @@ interface UseMultiplayerRoomReturn {
   markReady: (color: string) => Promise<void>
   markUnready: () => Promise<void>
   updateGameData: (data: Record<string, unknown>) => Promise<void>
-  finishGame: (winner: 'host' | 'guest' | 'draw') => Promise<void>
+  finishGame: (winner: 'host' | 'guest' | 'draw', extraData?: Record<string, unknown>) => Promise<void>
   requestRematch: (resetData: Record<string, unknown>) => Promise<void>
 
   isMyTurn: boolean
@@ -354,11 +354,18 @@ export function useMultiplayerRoom({
     await pushState(newState)
   }, [pushState])
 
-  const finishGame = useCallback(async (winner: 'host' | 'guest' | 'draw') => {
+  const finishGame = useCallback(async (winner: 'host' | 'guest' | 'draw', extraData?: Record<string, unknown>) => {
     if (!roomIdRef.current || !roomStateRef.current) return
     const current = roomStateRef.current
+    const winnerIdx = extraData?.winnerIdx as number | undefined
+    // Build updated players[] with score increment for 3+ player games
+    let updatedPlayers = current.players
+    if (updatedPlayers && winnerIdx !== undefined && winnerIdx >= 0) {
+      updatedPlayers = updatedPlayers.map((p, i) => i === winnerIdx ? { ...p, score: p.score + 1 } : p)
+    }
     const newState: RoomState = {
       ...current,
+      ...(extraData ?? {}),
       phase: 'finished',
       winner,
       host: {
@@ -369,6 +376,7 @@ export function useMultiplayerRoom({
         ...current.guest,
         score: current.guest.score + (winner === 'guest' ? 1 : 0),
       } : null,
+      ...(updatedPlayers ? { players: updatedPlayers } : {}),
     }
     await pushState(newState)
   }, [pushState])
