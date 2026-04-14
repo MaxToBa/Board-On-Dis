@@ -1,12 +1,10 @@
 'use client'
 import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/auth'
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setUser, setSession, setProfile } = useAuthStore()
-  const router = useRouter()
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }: { data: { session: import('@supabase/supabase-js').Session | null } }) => {
@@ -16,15 +14,15 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: string, session: import('@supabase/supabase-js').Session | null) => {
+      async (_event: string, session: import('@supabase/supabase-js').Session | null) => {
         setSession(session)
         setUser(session?.user ?? null)
         if (session?.user) {
           loadProfile(session.user.id)
         }
-        if (event === 'SIGNED_OUT') {
-          router.push('/login')
-        }
+        // Note: redirect on sign-out is handled by the Header's logout button directly.
+        // Do NOT redirect here — it would also fire for guests and expired-token scenarios,
+        // which would bounce unauthenticated users back to /login unexpectedly.
       }
     )
     return () => subscription.unsubscribe()
