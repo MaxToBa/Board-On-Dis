@@ -166,6 +166,7 @@ function UnoPage() {
   const [humanCalledUno, setHumanCalledUno] = useState(false) // AI mode only
 
   const timerRef      = useRef<ReturnType<typeof setInterval> | null>(null)
+  const timerRunning  = useRef(false)   // true only after ≥1 tick — prevents spurious auto-draw on turn switch
   const lastUnoMsg    = useRef<string | null>(null)
   const resultSaved   = useRef(false)
 
@@ -266,12 +267,15 @@ function UnoPage() {
   useEffect(() => {
     if (!isMultiplayer || !gameStarted || gameSettings.turnTimer === 0 || phase !== 'playing') {
       if (timerRef.current) clearInterval(timerRef.current)
+      timerRunning.current = false
       setTimeLeft(null)
       return
     }
     if (timerRef.current) clearInterval(timerRef.current)
+    timerRunning.current = false   // reset on every turn switch — auto-draw blocked until first tick
     setTimeLeft(gameSettings.turnTimer)
     timerRef.current = setInterval(() => {
+      timerRunning.current = true  // at least 1 tick has elapsed — auto-draw is now safe
       setTimeLeft(t => (t !== null && t > 0) ? t - 1 : 0)
     }, 1000)
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
@@ -280,7 +284,11 @@ function UnoPage() {
   // ── Auto-draw 2 on timeout ─────────────────────────────────────────────────
   useEffect(() => {
     if (timeLeft !== 0 || !isMyUnoTurn || !gameStarted || !isMultiplayer || phase !== 'playing') return
+    // Guard: only fire if the timer actually ran down (not if timeLeft=0 was inherited from a
+    // previous turn when unoPlayerIndex and timeLeft change in the same React render batch).
+    if (!timerRunning.current) return
     if (timerRef.current) clearInterval(timerRef.current)
+    timerRunning.current = false
     const playerCount = allPlayers.length || 2
     const myIdx = myPlayerIndex
     const drawn   = deck.slice(0, 2)
@@ -292,7 +300,8 @@ function UnoPage() {
     setUnoPlayerIndex(nextIdx); setMyTurn(false)
     updateGameData({
       [HAND_KEYS[myIdx]]: newHand, deck: rest,
-      currentTurn: nextTurn, unoPlayerIndex: nextIdx, unoMsg: null,
+      currentTurn: nextTurn, unoPlayerIndex: nextIdx,
+      unoNeeded: [], unoMsg: null,
     })
   }, [timeLeft]) // eslint-disable-line react-hooks/exhaustive-deps
 
