@@ -40,7 +40,11 @@ export default function GameModal({ game, onClose }: GameModalProps) {
   const playerName =
     profile?.username ??
     user?.email?.split('@')[0] ??
-    (typeof window !== 'undefined' ? sessionStorage.getItem('guestName') : null) ??
+    (typeof window !== 'undefined'
+      ? (sessionStorage.getItem('guestName') ??
+         (() => { const m = document.cookie.match(/(?:^|;\s*)guestName=([^;]*)/)
+           return m ? decodeURIComponent(m[1]) : null })())
+      : null) ??
     'Guest'
 
   function handleClose() {

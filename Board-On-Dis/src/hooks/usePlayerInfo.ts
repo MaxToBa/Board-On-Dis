@@ -7,7 +7,14 @@ export function usePlayerInfo() {
   const params = useSearchParams()
 
   const nameFromUrl = params.get('name')
-  const guestName = typeof window !== 'undefined' ? sessionStorage.getItem('guestName') : null
+  const guestName = typeof window !== 'undefined'
+    ? (() => {
+        const fromStorage = sessionStorage.getItem('guestName')
+        if (fromStorage) return fromStorage
+        const match = document.cookie.match(/(?:^|;\s*)guestName=([^;]*)/)
+        return match ? decodeURIComponent(match[1]) : null
+      })()
+    : null
 
   const playerName =
     profile?.username ??

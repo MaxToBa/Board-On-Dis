@@ -55,8 +55,13 @@ export default function LoginPage() {
   function handleGuest() {
     const name = guestName.trim()
     if (!name) return toast('กรุณาใส่ชื่อ', 'error')
-    sessionStorage.setItem('guestName', name)
-    router.push('/')
+    try {
+      sessionStorage.setItem('guestName', name)
+    } catch {
+      // sessionStorage unavailable (private browsing with strict settings) — fall back to cookie
+      document.cookie = `guestName=${encodeURIComponent(name)}; path=/`
+    }
+    window.location.href = '/'
   }
 
   return (
