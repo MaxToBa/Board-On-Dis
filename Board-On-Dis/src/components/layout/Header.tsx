@@ -102,12 +102,16 @@ export default function Header() {
               )}
             </div>
           ) : (
-            <Link
-              href="/login"
+            <button
+              onClick={() => {
+                // Clear guest cookie so proxy doesn't redirect back to /
+                document.cookie = 'guestName=; path=/; max-age=0'
+                window.location.href = '/login'
+              }}
               className="text-sm text-accent hover:text-accent/80 font-semibold transition-colors"
             >
               เข้าสู่ระบบ
-            </Link>
+            </button>
           )}
         </div>
       </div>

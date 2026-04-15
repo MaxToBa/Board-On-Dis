@@ -48,8 +48,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Already authenticated and on login page → go home
-  if ((session || hasGuestCookie) && isLoginPage) {
+  // Only redirect REAL authenticated users away from login (not guests —
+  // guests should be able to visit /login to create an account)
+  if (session && isLoginPage) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
