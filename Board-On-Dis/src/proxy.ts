@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -29,9 +29,8 @@ export async function middleware(request: NextRequest) {
   const { data: { session } } = await supabase.auth.getSession()
   const { pathname } = request.nextUrl
 
-  // Always allow: static assets, API routes, auth flow, login page
+  // Always allow: static assets, API routes, auth flow
   const isPublic =
-    pathname.startsWith('/login') ||
     pathname.startsWith('/api') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/auth') ||
@@ -39,15 +38,18 @@ export async function middleware(request: NextRequest) {
 
   if (isPublic) return response
 
-  // Allow guests — they set a guestName cookie on the login page
+  const isLoginPage = pathname.startsWith('/login')
+
+  // Allow guests — guestName cookie is a session cookie (deleted when browser closes)
   const hasGuestCookie = !!request.cookies.get('guestName')?.value
 
-  if (!session && !hasGuestCookie) {
+  // Unauthenticated and not a guest → go to login
+  if (!session && !hasGuestCookie && !isLoginPage) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Already logged in and trying to access login → go home
-  if (session && pathname.startsWith('/login')) {
+  // Already authenticated and on login page → go home
+  if ((session || hasGuestCookie) && isLoginPage) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 
